@@ -150,7 +150,7 @@ export function ChefManagementPage() {
     flatDetail: "",
     address: "",
     assignedSocieties: [],
-    defaultPassword: "Chef@" + Math.floor(1000 + Math.random() * 9000),
+    defaultPassword: "123456",
   });
 
   // Modal Form Location Options (cascading)
@@ -252,7 +252,7 @@ export function ChefManagementPage() {
       flatDetail: flat,
       address: addr,
       assignedSocieties: defaultSocName ? [defaultSocName] : [],
-      defaultPassword: "Chef@" + Math.floor(1000 + Math.random() * 9000),
+      defaultPassword: "123456",
     });
     setIsAddModalOpen(true);
   };

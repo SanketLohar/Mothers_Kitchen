@@ -231,7 +231,7 @@ export async function createChef(data) {
   const assignedSocieties = data.assignedSocieties || [];
   const baseSociety = data.baseSociety || "";
   const cleanMobile = (data.mobileNumber || "").replace(/\D/g, "");
-  const defaultPassword = data.defaultPassword || "Chef@1234";
+  const defaultPassword = data.defaultPassword || "123456";
   const userEmail = data.email?.trim().toLowerCase() || "";
 
   // Provision in Firebase Authentication (Priority: real email -> fallback: <mobile>@motherskitchen.com)
