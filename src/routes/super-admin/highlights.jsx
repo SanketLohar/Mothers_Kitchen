@@ -175,22 +175,22 @@ export function HighlightsPage() {
         </Badge>
       </div>
 
-      {/* 4 Compact Image Slots Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 4 Image Slots Grid: 3 in First Row, 1 in Row Below */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {highlights.map((slot) => (
-          <Card key={slot.slotNumber} className="border-border overflow-hidden flex flex-col justify-between shadow-2xs">
-            <CardHeader className="p-3 pb-2.5 border-b border-border/60">
+          <Card key={slot.slotNumber} className="border-border overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
+            <CardHeader className="p-4 pb-3 border-b border-border/70 bg-card">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <Badge className="bg-primary text-primary-foreground font-bold text-[10px] py-0 px-1.5">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Badge className="bg-primary text-primary-foreground font-bold text-xs py-0.5 px-2">
                     Slot #{slot.slotNumber}
                   </Badge>
-                  <CardTitle className="text-xs font-bold truncate">
+                  <CardTitle className="text-sm font-bold truncate text-foreground">
                     {slot.title || `Banner ${slot.slotNumber}`}
                   </CardTitle>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[10px] font-semibold text-muted-foreground">Active</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs font-semibold text-muted-foreground">Active</span>
                   <Switch
                     checked={slot.isActive}
                     onCheckedChange={() => handleToggleActive(slot.slotNumber)}
@@ -199,9 +199,9 @@ export function HighlightsPage() {
               </div>
             </CardHeader>
 
-            <CardContent className="p-3 space-y-2.5 flex-1 flex flex-col justify-between">
-              {/* Image Preview Box — Sleek & Compact */}
-              <div className="relative h-28 w-full rounded-lg overflow-hidden border border-border bg-muted flex items-center justify-center group shrink-0">
+            <CardContent className="p-4 sm:p-5 space-y-4 flex-1 flex flex-col justify-between">
+              {/* Image Preview Box — Spacious & High Visibility */}
+              <div className="relative h-44 sm:h-48 w-full rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center group shrink-0 shadow-inner">
                 {slot.imageUrl ? (
                   <>
                     <img
@@ -209,7 +209,7 @@ export function HighlightsPage() {
                       alt={slot.title}
                       className="size-full object-cover transition-transform duration-300 group-hover:scale-102"
                     />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
+                    <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
                       <label className="cursor-pointer">
                         <input
                           type="file"
@@ -217,9 +217,9 @@ export function HighlightsPage() {
                           className="hidden"
                           onChange={(e) => handleImageFileSelect(slot.slotNumber, e)}
                         />
-                        <Button type="button" size="sm" variant="secondary" className="h-7 text-[10px] px-2 gap-1 pointer-events-none">
-                          <Upload className="size-3" />
-                          <span>Change</span>
+                        <Button type="button" size="sm" variant="secondary" className="h-8 text-xs px-3 gap-1.5 pointer-events-none shadow-sm">
+                          <Upload className="size-3.5" />
+                          <span>Change Photo</span>
                         </Button>
                       </label>
                       <Button
@@ -227,65 +227,65 @@ export function HighlightsPage() {
                         size="sm"
                         variant="destructive"
                         onClick={() => handleRemoveImage(slot.slotNumber)}
-                        className="h-7 text-[10px] px-2 gap-1"
+                        className="h-8 text-xs px-3 gap-1.5 shadow-sm"
                       >
-                        <Trash2 className="size-3" />
+                        <Trash2 className="size-3.5" />
                         <span>Clear</span>
                       </Button>
                     </div>
                   </>
                 ) : (
-                  <label className="flex flex-col items-center justify-center size-full cursor-pointer hover:bg-muted/80 transition-colors p-2 text-center">
+                  <label className="flex flex-col items-center justify-center size-full cursor-pointer hover:bg-muted/80 transition-colors p-4 text-center">
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
                       onChange={(e) => handleImageFileSelect(slot.slotNumber, e)}
                     />
-                    <div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-1">
-                      <Upload className="size-4" />
+                    <div className="size-11 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2 shadow-2xs">
+                      <Upload className="size-5" />
                     </div>
-                    <span className="text-[11px] font-bold text-foreground">Upload Banner</span>
-                    <span className="text-[9px] text-muted-foreground mt-0.5">PNG, JPG, WebP (1080x540)</span>
+                    <span className="text-sm font-bold text-foreground">Upload Promotional Banner</span>
+                    <span className="text-xs text-muted-foreground mt-1">Recommended: 1080 x 540 px (PNG, JPG, WebP)</span>
                   </label>
                 )}
               </div>
 
               {/* Text Fields */}
-              <div className="space-y-2">
-                <div className="space-y-0.5">
-                  <Label htmlFor={`title-${slot.slotNumber}`} className="text-[11px] font-semibold text-muted-foreground">Banner Title</Label>
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <Label htmlFor={`title-${slot.slotNumber}`} className="text-xs font-semibold text-muted-foreground">Banner Title</Label>
                   <Input
                     id={`title-${slot.slotNumber}`}
-                    placeholder="e.g. Fresh Breakfast"
+                    placeholder="e.g. Fresh Homemade Breakfast"
                     value={slot.title}
                     onChange={(e) => handleUpdateText(slot.slotNumber, "title", e.target.value)}
-                    className="h-8 text-xs"
+                    className="h-9 text-xs sm:text-sm"
                   />
                 </div>
-                <div className="space-y-0.5">
-                  <Label htmlFor={`sub-${slot.slotNumber}`} className="text-[11px] font-semibold text-muted-foreground">Subtitle</Label>
+                <div className="space-y-1">
+                  <Label htmlFor={`sub-${slot.slotNumber}`} className="text-xs font-semibold text-muted-foreground">Subtitle / Promotional Caption</Label>
                   <Input
                     id={`sub-${slot.slotNumber}`}
-                    placeholder="e.g. Crafted with mother's touch"
+                    placeholder="e.g. Crafted with mother's touch & daily fresh ingredients"
                     value={slot.subtitle}
                     onChange={(e) => handleUpdateText(slot.slotNumber, "subtitle", e.target.value)}
-                    className="h-8 text-xs"
+                    className="h-9 text-xs sm:text-sm"
                   />
                 </div>
               </div>
 
               {/* Save Slot Button */}
-              <div className="pt-1 flex justify-end">
+              <div className="pt-2">
                 <Button
-                  size="sm"
+                  size="default"
                   variant="outline"
                   disabled={savingSlot === slot.slotNumber}
                   onClick={() => handleSaveSlot(slot.slotNumber)}
-                  className="h-7 text-[11px] px-2.5 gap-1 rounded-lg hover:bg-primary/5 hover:text-primary cursor-pointer w-full justify-center"
+                  className="h-9 text-xs font-bold px-3 gap-2 rounded-xl hover:border-primary hover:text-primary cursor-pointer w-full justify-center transition-colors shadow-2xs"
                 >
-                  <Save className="size-3" />
-                  <span>{savingSlot === slot.slotNumber ? "Saving..." : "Save Slot"}</span>
+                  <Save className="size-3.5" />
+                  <span>{savingSlot === slot.slotNumber ? "Saving Slot..." : "Save Banner Changes"}</span>
                 </Button>
               </div>
             </CardContent>

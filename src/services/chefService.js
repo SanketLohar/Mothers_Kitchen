@@ -313,6 +313,19 @@ export async function updateChef(chefId, data) {
     updatePayload.defaultPassword = data.defaultPassword;
   }
 
+  if (data.isDeactivatedByAdmin !== undefined) {
+    updatePayload.isDeactivatedByAdmin = Boolean(data.isDeactivatedByAdmin);
+  }
+  if (data.isActive !== undefined) {
+    updatePayload.isActive = Boolean(data.isActive);
+  }
+  if (data.flatNumber !== undefined) updatePayload.flatNumber = data.flatNumber;
+  if (data.wing !== undefined) updatePayload.wing = data.wing;
+  if (data.street !== undefined) updatePayload.street = data.street;
+  if (data.city !== undefined) updatePayload.city = data.city;
+  if (data.area !== undefined) updatePayload.area = data.area;
+  if (data.aadharNumber !== undefined) updatePayload.aadharNumber = data.aadharNumber;
+
   await updateDoc(docRef, updatePayload);
 
   // Sync into subcollections under matching societies

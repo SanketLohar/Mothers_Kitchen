@@ -318,6 +318,8 @@ export function ChefManagementPage() {
       address: addr,
       assignedSocieties: defaultSocName ? [defaultSocName] : [],
       defaultPassword: "123456",
+      isDeactivatedByAdmin: false,
+      isActive: true,
     });
     setAssignFilterCity("all");
     setAssignFilterArea("all");
@@ -348,6 +350,8 @@ export function ChefManagementPage() {
       address: chef.address || "",
       assignedSocieties: chef.assignedSocieties || [],
       defaultPassword: "••••••••",
+      isDeactivatedByAdmin: Boolean(chef.isDeactivatedByAdmin),
+      isActive: chef.isActive !== undefined ? Boolean(chef.isActive) : true,
     });
     setAssignFilterCity("all");
     setAssignFilterArea("all");
@@ -775,14 +779,13 @@ export function ChefManagementPage() {
               <TableHead>Chef</TableHead>
               <TableHead>Mobile Number</TableHead>
               <TableHead>Address</TableHead>
-              <TableHead className="w-36">Login Status</TableHead>
               <TableHead className="w-28 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredChefs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
                   No chefs match your search criteria.
                 </TableCell>
               </TableRow>
@@ -817,6 +820,11 @@ export function ChefManagementPage() {
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
                             {chef.id}
                           </span>
+                          {chef.isDeactivatedByAdmin && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-800 font-semibold border border-rose-200">
+                              Blocked
+                            </span>
+                          )}
                         </div>
                         <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                           <MapPin className="size-3" />
@@ -855,35 +863,6 @@ export function ChefManagementPage() {
                   </TableCell>
                   <TableCell className="max-w-xs text-xs text-muted-foreground truncate" title={chef.address}>
                     {chef.address || "—"}
-                  </TableCell>
-                  <TableCell>
-                    {/* Admin Access Switch & App Presence Pill */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={!chef.isDeactivatedByAdmin}
-                          onCheckedChange={() => handleToggleAdminDeactivation(chef.id)}
-                        />
-                        <Badge variant={chef.isDeactivatedByAdmin ? "destructive" : "success"}>
-                          {chef.isDeactivatedByAdmin ? "Admin Blocked" : "Admin Enabled"}
-                        </Badge>
-                      </div>
-
-                      {/* Prominent High-Visibility App Presence Pill */}
-                      <div>
-                        {chef.isActive ? (
-                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-bold shadow-2xs">
-                            <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span>Active on App</span>
-                          </div>
-                        ) : (
-                          <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-50 border border-amber-300 text-amber-800 text-[11px] font-semibold">
-                            <span className="size-2 rounded-full bg-amber-500" />
-                            <span>Offline on App</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -1254,6 +1233,73 @@ export function ChefManagementPage() {
                     </button>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* Account Status & App Availability (BRD Login Control) */}
+            <div className="p-3.5 rounded-xl bg-card border border-border space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-foreground font-bold text-xs uppercase tracking-wider">
+                  <Shield className="size-4 text-primary" />
+                  <span>Account Access & App Availability</span>
+                </div>
+                {editingChef && (
+                  <span className="text-[10px] text-muted-foreground font-mono">
+                    ID: {editingChef.id}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                {/* 1. Admin Login Access Toggle */}
+                <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-foreground">Admin Login Access</Label>
+                    <Badge variant={formData.isDeactivatedByAdmin ? "destructive" : "success"} className="text-[10px]">
+                      {formData.isDeactivatedByAdmin ? "Admin Blocked" : "Admin Enabled"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-muted-foreground max-w-[180px] leading-tight">
+                      {formData.isDeactivatedByAdmin
+                        ? "Chef is blocked from logging in to mobile app."
+                        : "Chef can log in and fulfill society orders."}
+                    </span>
+                    <Switch
+                      checked={!formData.isDeactivatedByAdmin}
+                      onCheckedChange={(enabled) =>
+                        setFormData((prev) => ({ ...prev, isDeactivatedByAdmin: !enabled }))
+                      }
+                    />
+                  </div>
+                </div>
+
+                {/* 2. Active App Status Toggle */}
+                <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-bold text-foreground">Chef App Availability</Label>
+                    <Badge
+                      variant={formData.isActive ? "success" : "secondary"}
+                      className={`text-[10px] gap-1 ${formData.isActive ? "bg-emerald-500/15 text-emerald-800 border-emerald-300" : ""}`}
+                    >
+                      <span className={`size-1.5 rounded-full ${formData.isActive ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
+                      {formData.isActive ? "Active on App" : "Offline on App"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] text-muted-foreground max-w-[180px] leading-tight">
+                      {formData.isActive
+                        ? "Chef is active and taking orders on customer app."
+                        : "Chef is offline and unavailable for orders."}
+                    </span>
+                    <Switch
+                      checked={Boolean(formData.isActive)}
+                      onCheckedChange={(active) =>
+                        setFormData((prev) => ({ ...prev, isActive: active }))
+                      }
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
