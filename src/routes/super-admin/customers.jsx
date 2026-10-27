@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { exportToExcel } from "@/lib/excel-export";
+import { toTitleCase } from "@/lib/utils";
 import { subscribeToCustomers } from "@/services/customerService";
 import { subscribeToSocieties } from "@/services/societyService";
 
@@ -170,13 +171,13 @@ export function CustomersPage() {
     try {
       const exportRows = filteredCustomers.map((c, i) => ({
         "Sr No": i + 1,
-        "Customer Name": c.name,
+        "Customer Name": toTitleCase(c.name),
         "Mobile Number": c.mobileNumber,
         "Email ID": c.email || "N/A",
         "Delivery Address": c.address,
-        "Society": c.society,
-        "Area": c.area,
-        "City": c.city,
+        "Society": toTitleCase(c.society),
+        "Area": toTitleCase(c.area),
+        "City": toTitleCase(c.city),
       }));
 
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -310,7 +311,7 @@ export function CustomersPage() {
                     {(currentPage - 1) * pageSize + idx + 1}
                   </TableCell>
                   <TableCell className="font-bold text-foreground">
-                    {cust.name}
+                    {toTitleCase(cust.name)}
                   </TableCell>
                   <TableCell className="font-mono text-sm text-foreground">
                     {cust.mobileNumber}
@@ -318,9 +319,9 @@ export function CustomersPage() {
                   <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={cust.address}>
                     {cust.address}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{cust.city}</TableCell>
-                  <TableCell className="font-medium text-foreground text-sm">{cust.area}</TableCell>
-                  <TableCell className="text-sm font-semibold text-primary">{cust.society}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{toTitleCase(cust.city)}</TableCell>
+                  <TableCell className="font-medium text-foreground text-sm">{toTitleCase(cust.area)}</TableCell>
+                  <TableCell className="text-sm font-semibold text-primary">{toTitleCase(cust.society)}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
@@ -386,10 +387,10 @@ export function CustomersPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="size-5 text-primary" />
-              <span>{viewingCustomer?.name}</span>
+              <span>{toTitleCase(viewingCustomer?.name)}</span>
             </DialogTitle>
             <DialogDescription>
-              Registered Resident • {viewingCustomer?.society}
+              Registered Resident • {toTitleCase(viewingCustomer?.society)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2 text-sm">
@@ -403,11 +404,11 @@ export function CustomersPage() {
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Society:</span>
-              <span className="font-semibold text-primary">{viewingCustomer?.society}</span>
+              <span className="font-semibold text-primary">{toTitleCase(viewingCustomer?.society)}</span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Area & City:</span>
-              <span>{viewingCustomer?.area}, {viewingCustomer?.city}</span>
+              <span>{toTitleCase(viewingCustomer?.area)}, {toTitleCase(viewingCustomer?.city)}</span>
             </div>
             <div className="space-y-1">
               <span className="text-xs font-bold text-muted-foreground uppercase">Complete Flat Address:</span>

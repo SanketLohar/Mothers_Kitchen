@@ -53,16 +53,16 @@ export function Sidebar({ className }) {
       )}
     >
       {/* Brand Header */}
-      <div className="p-5 border-b border-sidebar-border/80">
+      <div className="p-5 border-b border-sidebar-border">
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-xl bg-gradient-to-br from-[#F97316] to-[#c44e0a] text-white flex items-center justify-center shadow-md">
+          <div className="size-10 rounded-xl bg-gradient-to-br from-[#ea580c] to-[#c2410c] text-white flex items-center justify-center shadow-md shadow-orange-500/20">
             <CookingPot className="size-5" />
           </div>
           <div className="flex flex-col">
-            <span className="font-extrabold text-base tracking-tight text-white font-sans leading-none">
+            <span className="font-extrabold text-base tracking-tight text-foreground font-sans leading-none">
               Mother's Kitchen
             </span>
-            <span className="text-[11px] font-medium text-orange-300/90 tracking-wide mt-1">
+            <span className="text-[11px] font-bold text-primary tracking-wide mt-1">
               Super Admin Portal
             </span>
           </div>
@@ -71,7 +71,7 @@ export function Sidebar({ className }) {
 
       {/* Navigation Links */}
       <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
-        <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-orange-300/70">
+        <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
           Core Operations
         </div>
 
@@ -89,14 +89,14 @@ export function Sidebar({ className }) {
               className={cn(
                 "flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all group",
                 isActive
-                  ? "bg-sidebar-primary text-white font-semibold shadow-sm"
-                  : "text-sidebar-foreground/80 hover:bg-sidebar-accent hover:text-white"
+                  ? "bg-primary text-white font-bold shadow-xs shadow-orange-500/25"
+                  : "text-foreground/75 hover:bg-sidebar-accent hover:text-primary"
               )}
             >
               <Icon
                 className={cn(
                   "size-4.5 shrink-0 transition-colors",
-                  isActive ? "text-white" : "text-orange-300/70 group-hover:text-orange-200"
+                  isActive ? "text-white" : "text-muted-foreground group-hover:text-primary"
                 )}
               />
               <span className="flex-1 truncate">{item.label}</span>
@@ -109,30 +109,30 @@ export function Sidebar({ className }) {
       </nav>
 
       {/* Footer / Status Area */}
-      <div className="p-3 border-t border-sidebar-border/80 space-y-2">
+      <div className="p-3 border-t border-sidebar-border space-y-2">
         {/* Environment Status Badge */}
         {!isFirebaseConfigured && (
-          <div className="px-3 py-2 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
-            <div className="size-2 rounded-full bg-amber-400 animate-pulse" />
-            <span className="truncate">Demo Mode (Local Data)</span>
+          <div className="px-3 py-2 rounded-xl bg-amber-500/10 border border-amber-500/25 text-amber-800 text-xs flex items-center gap-2">
+            <div className="size-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="truncate font-semibold">Demo Mode (Local Data)</span>
           </div>
         )}
 
         {/* User & Logout */}
-        <div className="flex items-center justify-between p-2 rounded-xl bg-sidebar-accent/50">
+        <div className="flex items-center justify-between p-2 rounded-xl bg-muted/50 border border-border/60">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="size-8 rounded-lg bg-[#e8650a] text-white font-bold text-xs flex items-center justify-center shrink-0">
+            <div className="size-8 rounded-lg bg-primary text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-xs">
               SA
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-white truncate">Super Admin</p>
-              <p className="text-[10px] text-sidebar-foreground/60 truncate">admin@motherskitchen</p>
+              <p className="text-xs font-bold text-foreground truncate">Super Admin</p>
+              <p className="text-[10px] text-muted-foreground truncate">admin@motherskitchen</p>
             </div>
           </div>
           <button
             onClick={handleLogout}
             title="Sign out"
-            className="p-1.5 text-sidebar-foreground/70 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer"
           >
             <LogOut className="size-4" />
           </button>

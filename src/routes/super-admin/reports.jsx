@@ -37,7 +37,7 @@ import {
   Cell,
   Legend,
 } from "recharts";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, toTitleCase } from "@/lib/utils";
 import { exportToExcel } from "@/lib/excel-export";
 import { toast } from "sonner";
 import { subscribeToDashboardKpis } from "@/services/dashboardService";
@@ -109,9 +109,9 @@ export function StatisticsReportsPage() {
     try {
       const rows = societies.map((s, i) => ({
         "Sr No": i + 1,
-        "Society Name": s.name,
-        "Area": s.area,
-        "City": s.city,
+        "Society Name": toTitleCase(s.name),
+        "Area": toTitleCase(s.area),
+        "City": toTitleCase(s.city),
         "Total Chefs": s.totalChefs || 0,
         "Total Customers": s.totalCustomers || 0,
         "Total Orders": Math.round((s.totalOrders || 0) * periodMultiplier),
@@ -194,21 +194,21 @@ export function StatisticsReportsPage() {
         </CardContent>
       </Card>
 
-      {/* Aggregate KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Aggregate KPI Cards (Sleek & Uniform) */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           title="Period Orders"
           value={activeStats.orders}
           icon={ShoppingBag}
           tone="primary"
-          subtitle={`Orders during ${selectedPeriod.replace("_", " ")}`}
+          subtitle={`Orders during ${(selectedPeriod || "").replace("_", " ")}`}
         />
         <KpiCard
           title="Period Revenue"
           value={formatCurrency(activeStats.revenue)}
           icon={IndianRupee}
           tone="emerald"
-          subtitle={`Earnings during ${selectedPeriod.replace("_", " ")}`}
+          subtitle={`Earnings during ${(selectedPeriod || "").replace("_", " ")}`}
         />
         <KpiCard
           title="Total Active Chefs"
@@ -259,7 +259,7 @@ export function StatisticsReportsPage() {
                       {idx + 1}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground">
-                      {s.name}
+                      {toTitleCase(s.name)}
                     </TableCell>
                     <TableCell className="text-center font-bold text-emerald-700">
                       {s.totalChefs || 0}
@@ -305,7 +305,7 @@ export function StatisticsReportsPage() {
                       {idx + 1}
                     </TableCell>
                     <TableCell className="font-semibold text-foreground">
-                      {s.name}
+                      {toTitleCase(s.name)}
                     </TableCell>
                     <TableCell className="text-center font-bold text-primary">
                       {Math.round((s.totalOrders || 0) * periodMultiplier)}

@@ -56,26 +56,74 @@ function DashboardPage() {
       title="Dashboard"
       subtitle="Live operational overview across societies, registered cooks, customers, and revenues."
     >
-      {/* Welcome Banner matching App Palette */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[#3d1a08] via-[#5c2810] to-[#e8650a] p-8 text-white shadow-lg">
-        <div className="relative z-10 max-w-2xl space-y-2">
-          <Badge className="bg-orange-400/20 text-orange-200 border-orange-400/30">
+      {/* Welcome Banner matching Fresh App Palette */}
+      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] p-6 sm:p-7 text-white shadow-md shadow-orange-500/15">
+        <div className="relative z-10 max-w-2xl space-y-1.5">
+          <Badge className="bg-white/20 text-white border-white/30 text-[11px] font-semibold">
             Mother's Kitchen Operations
           </Badge>
-          <h2 className="text-3xl font-extrabold tracking-tight font-sans">
+          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-sans">
             Welcome, Super Admin
           </h2>
-          <p className="text-orange-100/90 text-sm leading-relaxed">
+          <p className="text-orange-50 text-xs sm:text-sm leading-relaxed">
             Manage societies, approved cooks, customers, and track daily homemade food orders right across your residential network.
           </p>
         </div>
         <div className="absolute right-6 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-4 opacity-15">
-          <ChefHat className="size-48 text-white" />
+          <ChefHat className="size-40 text-white" />
         </div>
       </div>
 
-      {/* KPI Cards Row (Live DB Counts) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      {/* Quick Action Links — Shifted Up for High Priority Access */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <Link to="/super-admin/society" className="group">
+          <div className="p-3.5 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center gap-3 shadow-2xs">
+            <div className="size-9 rounded-lg bg-sky-500/10 text-sky-700 flex items-center justify-center shrink-0">
+              <Building2 className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-foreground group-hover:text-primary truncate">Add Society</div>
+              <div className="text-[10px] text-muted-foreground truncate">Wings & floors</div>
+            </div>
+          </div>
+        </Link>
+        <Link to="/super-admin/chefs" className="group">
+          <div className="p-3.5 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center gap-3 shadow-2xs">
+            <div className="size-9 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
+              <ChefHat className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-foreground group-hover:text-primary truncate">Register Chef</div>
+              <div className="text-[10px] text-muted-foreground truncate">Login & delivery</div>
+            </div>
+          </div>
+        </Link>
+        <Link to="/super-admin/highlights" className="group">
+          <div className="p-3.5 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center gap-3 shadow-2xs">
+            <div className="size-9 rounded-lg bg-amber-500/10 text-amber-700 flex items-center justify-center shrink-0">
+              <Sparkles className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-foreground group-hover:text-primary truncate">App Highlights</div>
+              <div className="text-[10px] text-muted-foreground truncate">4 mobile sliders</div>
+            </div>
+          </div>
+        </Link>
+        <Link to="/super-admin/marketing" className="group">
+          <div className="p-3.5 rounded-xl border border-border bg-card hover:border-primary/50 hover:bg-primary/5 transition-all flex items-center gap-3 shadow-2xs">
+            <div className="size-9 rounded-lg bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center shrink-0">
+              <Megaphone className="size-4.5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs font-bold text-foreground group-hover:text-primary truncate">WhatsApp Push</div>
+              <div className="text-[10px] text-muted-foreground truncate">Society promos</div>
+            </div>
+          </div>
+        </Link>
+      </div>
+
+      {/* KPI Cards Row (Live DB Counts — Sleek & Compact) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         <Link to="/super-admin/society" className="group">
           <KpiCard
             title="Total Societies"
@@ -123,10 +171,10 @@ function DashboardPage() {
         </Link>
       </div>
 
-      {/* Quick Access Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Operational Details Grid */}
+      <div className="grid grid-cols-1 gap-6">
         {/* Top Operational Societies */}
-        <Card className="lg:col-span-2 border-border">
+        <Card className="border-border">
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <div>
               <CardTitle className="text-base font-bold">Top Performing Societies</CardTitle>
@@ -178,63 +226,6 @@ function DashboardPage() {
                 </div>
               ))
             )}
-          </CardContent>
-        </Card>
-
-        {/* Quick Operations Actions */}
-        <Card className="border-border flex flex-col justify-between">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base font-bold">Quick Actions</CardTitle>
-            <p className="text-xs text-muted-foreground">Common administrative workflows</p>
-          </CardHeader>
-          <CardContent className="space-y-3 flex-1 flex flex-col justify-center">
-            <Link to="/super-admin/society">
-              <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl text-left cursor-pointer">
-                <div className="size-8 rounded-lg bg-sky-500/10 text-sky-700 flex items-center justify-center shrink-0">
-                  <Building2 className="size-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-foreground">Add New Society</div>
-                  <div className="text-[11px] text-muted-foreground">Configure wings and floor counts</div>
-                </div>
-              </Button>
-            </Link>
-
-            <Link to="/super-admin/chefs">
-              <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl text-left cursor-pointer">
-                <div className="size-8 rounded-lg bg-emerald-500/10 text-emerald-700 flex items-center justify-center shrink-0">
-                  <ChefHat className="size-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-foreground">Register New Chef</div>
-                  <div className="text-[11px] text-muted-foreground">Provision cook login & delivery mapping</div>
-                </div>
-              </Button>
-            </Link>
-
-            <Link to="/super-admin/highlights">
-              <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl text-left cursor-pointer">
-                <div className="size-8 rounded-lg bg-amber-500/10 text-amber-700 flex items-center justify-center shrink-0">
-                  <Sparkles className="size-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-foreground">Update App Highlights</div>
-                  <div className="text-[11px] text-muted-foreground">Manage 4 customer home slider banners</div>
-                </div>
-              </Button>
-            </Link>
-
-            <Link to="/super-admin/marketing">
-              <Button variant="outline" className="w-full justify-start gap-3 h-12 rounded-xl text-left cursor-pointer">
-                <div className="size-8 rounded-lg bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center shrink-0">
-                  <Megaphone className="size-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-foreground">WhatsApp Broadcast</div>
-                  <div className="text-[11px] text-muted-foreground">Send society targeted promotions</div>
-                </div>
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       </div>

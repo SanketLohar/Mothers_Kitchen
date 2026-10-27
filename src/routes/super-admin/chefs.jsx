@@ -63,6 +63,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { exportToExcel } from "@/lib/excel-export";
+import { formatCurrency, toTitleCase } from "@/lib/utils";
 import {
   subscribeToChefs,
   createChef,
@@ -147,11 +148,36 @@ export function ChefManagementPage() {
     city: "",
     area: "",
     baseSociety: "",
-    flatDetail: "",
+    flatNumber: "",
+    wing: "",
+    street: "",
     address: "",
     assignedSocieties: [],
     defaultPassword: "123456",
   });
+
+  // Delivery Societies Allocation Filters
+  const [assignFilterCity, setAssignFilterCity] = useState("all");
+  const [assignFilterArea, setAssignFilterArea] = useState("all");
+
+  const assignAvailableCities = useMemo(() => {
+    return Array.from(new Set(societiesList.map((s) => s.city).filter(Boolean))).sort();
+  }, [societiesList]);
+
+  const assignAvailableAreas = useMemo(() => {
+    const list = assignFilterCity === "all"
+      ? societiesList
+      : societiesList.filter((s) => (s.city || "").toLowerCase() === assignFilterCity.toLowerCase());
+    return Array.from(new Set(list.map((s) => s.area).filter(Boolean))).sort();
+  }, [societiesList, assignFilterCity]);
+
+  const filteredAssignableSocieties = useMemo(() => {
+    return societiesList.filter((s) => {
+      const matchCity = assignFilterCity === "all" || (s.city || "").toLowerCase() === assignFilterCity.toLowerCase();
+      const matchArea = assignFilterArea === "all" || (s.area || "").toLowerCase() === assignFilterArea.toLowerCase();
+      return matchCity && matchArea;
+    });
+  }, [societiesList, assignFilterCity, assignFilterArea]);
 
   // Modal Form Location Options (cascading)
   const formAvailableCities = useMemo(() => {
@@ -173,8 +199,11 @@ export function ChefManagementPage() {
     });
   }, [societiesList, formData.city, formData.area]);
 
-  const updateFormattedAddress = (flat, soc, area, city) => {
-    return [flat, soc, area, city].filter(Boolean).join(", ");
+  const updateFormattedAddress = (flat, wing, street, soc, area, city) => {
+    const flatStr = flat ? (flat.toLowerCase().startsWith("flat") ? flat : `Flat ${flat}`) : "";
+    const wingStr = wing ? (wing.toLowerCase().startsWith("wing") ? wing : `Wing ${wing}`) : "";
+    const flatWing = [flatStr, wingStr].filter(Boolean).join(", ");
+    return [flatWing, street, soc, area, city].filter(Boolean).join(", ");
   };
 
   const handleFormCityChange = (newCity) => {
@@ -188,7 +217,7 @@ export function ChefManagementPage() {
       city: newCity,
       area: newArea,
       baseSociety: newSoc,
-      address: updateFormattedAddress(prev.flatDetail, newSoc, newArea, newCity),
+      address: updateFormattedAddress(prev.flatNumber, prev.wing, prev.street, newSoc, newArea, newCity),
       assignedSocieties: newSoc ? Array.from(new Set([...prev.assignedSocieties, newSoc])) : prev.assignedSocieties,
     }));
   };
@@ -203,7 +232,7 @@ export function ChefManagementPage() {
       ...prev,
       area: newArea,
       baseSociety: newSoc,
-      address: updateFormattedAddress(prev.flatDetail, newSoc, newArea, prev.city),
+      address: updateFormattedAddress(prev.flatNumber, prev.wing, prev.street, newSoc, newArea, prev.city),
       assignedSocieties: newSoc ? Array.from(new Set([...prev.assignedSocieties, newSoc])) : prev.assignedSocieties,
     }));
   };
@@ -218,42 +247,80 @@ export function ChefManagementPage() {
       city,
       area,
       baseSociety: newSoc,
-      address: updateFormattedAddress(prev.flatDetail, newSoc, area, city),
+      address: updateFormattedAddress(prev.flatNumber, prev.wing, prev.street, newSoc, area, city),
       assignedSocieties: newSoc ? Array.from(new Set([...prev.assignedSocieties, newSoc])) : prev.assignedSocieties,
     }));
   };
 
-  const handleFormFlatChange = (flat) => {
+  const handleFormFlatChange = (flatNumber) => {
     setFormData((prev) => ({
       ...prev,
-      flatDetail: flat,
-      address: updateFormattedAddress(flat, prev.baseSociety, prev.area, prev.city),
+      flatNumber,
+      address: updateFormattedAddress(flatNumber, prev.wing, prev.street, prev.baseSociety, prev.area, prev.city),
     }));
+  };
+
+  const handleFormWingChange = (wing) => {
+    setFormData((prev) => ({
+      ...prev,
+      wing,
+      address: updateFormattedAddress(prev.flatNumber, wing, prev.street, prev.baseSociety, prev.area, prev.city),
+    }));
+  };
+
+  const handleFormStreetChange = (street) => {
+    setFormData((prev) => ({
+      ...prev,
+      street,
+      address: updateFormattedAddress(prev.flatNumber, prev.wing, street, prev.baseSociety, prev.area, prev.city),
+    }));
+  };
+
+  const handlePhotoSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      toast.error("Please upload an image file (PNG, JPG, WebP).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Image file size exceeds the 5 MB limit.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setFormData((prev) => ({ ...prev, photoUrl: event.target.result }));
+      toast.success("Photo attached successfully!");
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleOpenAddModal = () => {
     setEditingChef(null);
     const firstSoc = societiesList[0];
-    const defaultCity = firstSoc?.city || "Pune";
-    const defaultArea = firstSoc?.area || "";
-    const defaultSocName = firstSoc?.name || "";
-    const flat = "";
-    const addr = [flat, defaultSocName, defaultArea, defaultCity].filter(Boolean).join(", ");
+    const defaultCity = toTitleCase(firstSoc?.city || "Pune");
+    const defaultArea = toTitleCase(firstSoc?.area || "");
+    const defaultSocName = toTitleCase(firstSoc?.name || "");
+    const addr = [defaultSocName, defaultArea, defaultCity].filter(Boolean).join(", ");
 
     setFormData({
       fullName: "",
       email: "",
       mobileNumber: "",
       photoUrl: "",
-      idCardNumber: "MH-PUN-" + Math.floor(1000 + Math.random() * 9000),
+      idCardNumber: "",
       city: defaultCity,
       area: defaultArea,
       baseSociety: defaultSocName,
-      flatDetail: flat,
+      flatNumber: "",
+      wing: "",
+      street: "",
       address: addr,
       assignedSocieties: defaultSocName ? [defaultSocName] : [],
       defaultPassword: "123456",
     });
+    setAssignFilterCity("all");
+    setAssignFilterArea("all");
     setIsAddModalOpen(true);
   };
 
@@ -262,24 +329,28 @@ export function ChefManagementPage() {
     const foundSoc = societiesList.find(
       (s) => s.name === chef.baseSociety || s.id === chef.baseSociety
     );
-    const chefCity = foundSoc?.city || societiesList[0]?.city || "Pune";
-    const chefArea = foundSoc?.area || "";
-    const chefBaseSoc = chef.baseSociety || foundSoc?.name || "";
+    const chefCity = toTitleCase(foundSoc?.city || societiesList[0]?.city || "Pune");
+    const chefArea = toTitleCase(foundSoc?.area || "");
+    const chefBaseSoc = toTitleCase(chef.baseSociety || foundSoc?.name || "");
 
     setFormData({
-      fullName: chef.fullName,
+      fullName: toTitleCase(chef.fullName || chef.name || ""),
       email: chef.email || "",
-      mobileNumber: chef.mobileNumber,
+      mobileNumber: chef.mobileNumber || "",
       photoUrl: chef.photoUrl || "",
-      idCardNumber: chef.idCardNumber || "",
+      idCardNumber: chef.idCardNumber || chef.aadharNumber || "",
       city: chefCity,
       area: chefArea,
       baseSociety: chefBaseSoc,
-      flatDetail: "",
+      flatNumber: chef.flatNumber || "",
+      wing: chef.wing || "",
+      street: chef.street || "",
       address: chef.address || "",
       assignedSocieties: chef.assignedSocieties || [],
       defaultPassword: "••••••••",
     });
+    setAssignFilterCity("all");
+    setAssignFilterArea("all");
     setIsAddModalOpen(true);
   };
 
@@ -335,7 +406,10 @@ export function ChefManagementPage() {
   const handleSaveChef = async (e) => {
     e.preventDefault();
 
-    if (!formData.fullName.trim() || !formData.mobileNumber.trim()) {
+    const chefName = String(formData.fullName || "").trim();
+    const chefMob = String(formData.mobileNumber || "").trim();
+
+    if (!chefName || !chefMob) {
       toast.error("Please fill in Chef Full Name and Mobile Number.");
       return;
     }
@@ -345,54 +419,54 @@ export function ChefManagementPage() {
       return;
     }
 
+    const payload = {
+      ...formData,
+      fullName: toTitleCase(chefName),
+      city: toTitleCase(formData.city),
+      area: toTitleCase(formData.area),
+      baseSociety: toTitleCase(formData.baseSociety),
+      street: toTitleCase(formData.street),
+      idCardNumber: (formData.idCardNumber || "").trim(),
+      aadharNumber: (formData.idCardNumber || "").trim(),
+    };
+
     setIsSubmitting(true);
     try {
       if (editingChef) {
         if (isFirebaseConfigured && !editingChef.id.startsWith("chef-")) {
-          await updateChef(editingChef.id, formData);
-          toast.success(`Chef "${formData.fullName}" profile updated in Firestore!`);
+          await updateChef(editingChef.id, payload);
+          toast.success(`Chef "${payload.fullName}" profile updated in Firestore!`);
         } else {
           setChefs((prev) =>
             prev.map((c) =>
               c.id === editingChef.id
                 ? {
                     ...c,
-                    fullName: formData.fullName.trim(),
-                    email: formData.email.trim(),
-                    mobileNumber: formData.mobileNumber.trim(),
-                    photoUrl: formData.photoUrl,
-                    idCardNumber: formData.idCardNumber.trim(),
-                    address: formData.address.trim(),
-                    baseSociety: formData.baseSociety,
-                    assignedSocieties: formData.assignedSocieties,
+                    ...payload,
+                    idCardNumber: payload.idCardNumber,
+                    aadharNumber: payload.aadharNumber,
                   }
                 : c
             )
           );
-          toast.success(`Chef "${formData.fullName}" profile updated.`);
+          toast.success(`Chef "${payload.fullName}" profile updated.`);
         }
       } else {
         if (isFirebaseConfigured) {
-          const created = await createChef(formData);
-          toast.success(`Chef "${formData.fullName}" registered successfully with ID ${created.id}!`);
+          const created = await createChef(payload);
+          toast.success(`Chef "${payload.fullName}" registered successfully with ID ${created.id}!`);
         } else {
+          const cleanM = chefMob.replace(/\D/g, "");
           const newChef = {
             id: `chef-${Date.now()}`,
-            fullName: formData.fullName.trim(),
-            email: formData.email.trim() || `${formData.mobileNumber.replace(/\D/g, "")}@motherskitchen.com`,
-            mobileNumber: formData.mobileNumber.trim(),
-            photoUrl: formData.photoUrl,
-            idCardNumber: formData.idCardNumber.trim(),
-            address: formData.address.trim(),
-            baseSociety: formData.baseSociety,
-            assignedSocieties: formData.assignedSocieties,
-            activeDeliverableSocieties: formData.assignedSocieties,
+            ...payload,
+            email: payload.email.trim() || `${cleanM}@motherskitchen.com`,
             status: "enabled",
             isDailyActive: true,
           };
           setChefs((prev) => [newChef, ...prev]);
           toast.success(
-            `Chef "${formData.fullName}" registered. Credentials: ${formData.mobileNumber} / ${formData.defaultPassword}`
+            `Chef "${payload.fullName}" registered. Credentials: ${chefMob} / ${formData.defaultPassword}`
           );
         }
       }
@@ -433,14 +507,13 @@ export function ChefManagementPage() {
       const exportRows = filteredChefs.map((c, i) => ({
         "Sr No": i + 1,
         "Chef ID": c.id,
-        "Chef Name": c.fullName,
+        "Chef Name": toTitleCase(c.fullName || c.name || "Chef"),
         "Mobile Number": c.mobileNumber,
         "Auth Email": c.authEmail || c.email || "N/A",
         "Default Password": c.defaultPassword || c.password || "N/A",
-        "Base Society": c.baseSociety || "Not Set",
-        "Allotted Societies": (c.assignedSocieties || []).join(", "),
+        "Base Society": toTitleCase(c.baseSociety || "Not Set"),
         "Address": c.address || "",
-        "ID Card Number": c.idCardNumber || "",
+        "Aadhar Card Number": c.idCardNumber || c.aadharNumber || "",
         "Admin Login Status": c.isDeactivatedByAdmin ? "Blocked by Admin" : "Enabled by Admin",
         "Chef Mobile App Status": c.isActive ? "Active (Taking Orders)" : "Inactive (Offline)",
         "Rating": Number(c.rating || 5.0),
@@ -448,8 +521,8 @@ export function ChefManagementPage() {
       }));
 
       const dateStr = new Date().toISOString().slice(0, 10);
-      const socSuffix = selectedSociety !== "all" ? `_${selectedSociety.replace(/\s+/g, "_")}` : "";
-      exportToExcel(exportRows, `Mothers_Kitchen_Chefs${socSuffix}_${dateStr}`, "Chefs");
+      const safeSoc = selectedSociety !== "all" ? `_${String(selectedSociety || "").replace(/\s+/g, "_")}` : "";
+      exportToExcel(exportRows, `Mothers_Kitchen_Chefs${safeSoc}_${dateStr}`, "Chefs");
       toast.success(`Exported ${exportRows.length} chef records to Excel (.xlsx)!`);
     } catch (err) {
       console.error("Excel export error:", err);
@@ -458,15 +531,25 @@ export function ChefManagementPage() {
   };
 
   const filteredChefs = useMemo(() => {
-    return chefs.filter((c) => {
-      const query = searchQuery.toLowerCase().trim();
+    return chefs.map((c) => ({
+      ...c,
+      fullName: toTitleCase(c.fullName || c.name || "Chef"),
+      baseSociety: toTitleCase(c.baseSociety || ""),
+    })).filter((c) => {
+      const query = String(searchQuery || "").toLowerCase().trim();
+      const cName = String(c.fullName || "").toLowerCase();
+      const cMob = String(c.mobileNumber || "").toLowerCase();
+      const cAddr = String(c.address || "").toLowerCase();
+      const cBaseSoc = String(c.baseSociety || "").toLowerCase();
+      const cId = String(c.id || "").toLowerCase();
+
       const matchesSearch =
         !query ||
-        c.fullName.toLowerCase().includes(query) ||
-        c.mobileNumber.toLowerCase().includes(query) ||
-        (c.address || "").toLowerCase().includes(query) ||
-        (c.baseSociety || "").toLowerCase().includes(query) ||
-        (c.id || "").toLowerCase().includes(query);
+        cName.includes(query) ||
+        cMob.includes(query) ||
+        cAddr.includes(query) ||
+        cBaseSoc.includes(query) ||
+        cId.includes(query);
 
       // Filter by admin status
       const matchesStatus =
@@ -487,19 +570,19 @@ export function ChefManagementPage() {
       // Check City match
       const matchesCity =
         selectedCity === "all" ||
-        matchedSocs.some((s) => s.city === selectedCity) ||
-        (c.address && c.address.toLowerCase().includes(selectedCity.toLowerCase()));
+        matchedSocs.some((s) => String(s.city || "").toLowerCase() === selectedCity.toLowerCase()) ||
+        cAddr.includes(selectedCity.toLowerCase());
 
       // Check Area match
       const matchesArea =
         selectedArea === "all" ||
-        matchedSocs.some((s) => s.area === selectedArea) ||
-        (c.address && c.address.toLowerCase().includes(selectedArea.toLowerCase()));
+        matchedSocs.some((s) => String(s.area || "").toLowerCase() === selectedArea.toLowerCase()) ||
+        cAddr.includes(selectedArea.toLowerCase());
 
       // Check Society match
       const matchesSociety =
         selectedSociety === "all" ||
-        chefSocietyNames.includes(selectedSociety);
+        chefSocietyNames.some((sn) => sn.toLowerCase() === selectedSociety.toLowerCase());
 
       return matchesSearch && matchesStatus && matchesCity && matchesArea && matchesSociety;
     });
@@ -692,7 +775,6 @@ export function ChefManagementPage() {
               <TableHead>Chef</TableHead>
               <TableHead>Mobile Number</TableHead>
               <TableHead>Address</TableHead>
-              <TableHead>Allotted Societies</TableHead>
               <TableHead className="w-36">Login Status</TableHead>
               <TableHead className="w-28 text-right">Actions</TableHead>
             </TableRow>
@@ -700,7 +782,7 @@ export function ChefManagementPage() {
           <TableBody>
             {filteredChefs.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
                   No chefs match your search criteria.
                 </TableCell>
               </TableRow>
@@ -731,14 +813,14 @@ export function ChefManagementPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-foreground">{chef.fullName}</span>
+                          <span className="font-bold text-foreground">{toTitleCase(chef.fullName)}</span>
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
                             {chef.id}
                           </span>
                         </div>
                         <div className="text-[11px] text-muted-foreground flex items-center gap-1">
                           <MapPin className="size-3" />
-                          {chef.baseSociety || "No base society"}
+                          {toTitleCase(chef.baseSociety) || "No base society"}
                         </div>
                       </div>
                     </div>
@@ -773,26 +855,6 @@ export function ChefManagementPage() {
                   </TableCell>
                   <TableCell className="max-w-xs text-xs text-muted-foreground truncate" title={chef.address}>
                     {chef.address || "—"}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1 max-w-xs">
-                      {chef.assignedSocieties?.slice(0, 2).map((soc, i) => (
-                        <Badge
-                          key={i}
-                          variant={selectedSociety === soc ? "default" : "outline"}
-                          className="text-[10px] cursor-pointer hover:border-primary transition-colors"
-                          onClick={() => setSelectedSociety(selectedSociety === soc ? "all" : soc)}
-                          title={`Click to filter by ${soc}`}
-                        >
-                          {soc}
-                        </Badge>
-                      ))}
-                      {(chef.assignedSocieties?.length || 0) > 2 && (
-                        <Badge variant="secondary" className="text-[10px]">
-                          +{chef.assignedSocieties.length - 2} more
-                        </Badge>
-                      )}
-                    </div>
                   </TableCell>
                   <TableCell>
                     {/* Admin Access Switch & App Presence Pill */}
@@ -904,25 +966,65 @@ export function ChefManagementPage() {
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="chefIdCard">ID Card Number</Label>
+                <Label htmlFor="chefIdCard">Aadhar Card Number</Label>
                 <Input
                   id="chefIdCard"
-                  placeholder="MH-PUN-2024-XXXX"
+                  placeholder="e.g. 1234 5678 9012"
                   value={formData.idCardNumber}
                   onChange={(e) => setFormData({ ...formData, idCardNumber: e.target.value })}
                 />
               </div>
             </div>
 
-            {/* Photo URL / Upload */}
+            {/* Photo Upload Option with Live Preview */}
             <div className="space-y-1.5">
-              <Label htmlFor="photo">Chef Photograph URL</Label>
-              <Input
-                id="photo"
-                value={formData.photoUrl}
-                onChange={(e) => setFormData({ ...formData, photoUrl: e.target.value })}
-                placeholder="https://..."
-              />
+              <Label>Chef Photograph</Label>
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+                <div className="relative size-14 rounded-full overflow-hidden border-2 border-primary/25 bg-card flex items-center justify-center shrink-0 shadow-2xs">
+                  {formData.photoUrl ? (
+                    <img
+                      src={formData.photoUrl}
+                      alt="Chef Preview"
+                      className="size-full object-cover"
+                    />
+                  ) : (
+                    <ChefHat className="size-6 text-muted-foreground/60" />
+                  )}
+                </div>
+                <div className="flex-1 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <label className="cursor-pointer">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handlePhotoSelect}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 text-xs gap-1.5 pointer-events-none rounded-lg"
+                      >
+                        <Upload className="size-3.5" />
+                        <span>{formData.photoUrl ? "Change Photo" : "Upload Photo"}</span>
+                      </Button>
+                    </label>
+                    {formData.photoUrl && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setFormData((prev) => ({ ...prev, photoUrl: "" }))}
+                        className="h-8 text-xs text-destructive hover:bg-destructive/10 rounded-lg cursor-pointer"
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">PNG, JPG, or WebP up to 5 MB</p>
+                </div>
+              </div>
             </div>
 
             {/* Location & Complete Address Hierarchy (Laundrysta Style) */}
@@ -948,7 +1050,7 @@ export function ChefManagementPage() {
                     <option value="">Select Stored City</option>
                     {formAvailableCities.map((ct) => (
                       <option key={ct} value={ct}>
-                        {ct}
+                        {toTitleCase(ct)}
                       </option>
                     ))}
                   </select>
@@ -962,18 +1064,18 @@ export function ChefManagementPage() {
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                     required
                   >
-                    <option value="">Select Area in {formData.city || "City"}</option>
+                    <option value="">Select Area in {toTitleCase(formData.city) || "City"}</option>
                     {formAvailableAreas.map((ar) => (
                       <option key={ar} value={ar}>
-                        {ar}
+                        {toTitleCase(ar)}
                       </option>
                     ))}
                   </select>
                 </div>
               </div>
 
-              {/* Base Society & Flat / Unit Details */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Base Society & Separate Flat / Wing / Street Fields */}
+              <div className="space-y-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Base Residence Society *</Label>
                   <select
@@ -985,21 +1087,43 @@ export function ChefManagementPage() {
                     <option value="">Select Base Society</option>
                     {formAvailableSocieties.map((soc) => (
                       <option key={soc.id} value={soc.name}>
-                        {soc.name}
+                        {toTitleCase(soc.name)}
                       </option>
                     ))}
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Flat No. / Wing / Street *</Label>
-                  <Input
-                    placeholder="e.g. Flat A-101, Wing B"
-                    value={formData.flatDetail || ""}
-                    onChange={(e) => handleFormFlatChange(e.target.value)}
-                    className="h-10 text-xs"
-                    required
-                  />
+                {/* Separate Fields for Flat Number, Wing, Street */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Flat / Unit No. *</Label>
+                    <Input
+                      placeholder="e.g. 101, A-204"
+                      value={formData.flatNumber || ""}
+                      onChange={(e) => handleFormFlatChange(e.target.value)}
+                      className="h-10 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Wing / Building *</Label>
+                    <Input
+                      placeholder="e.g. Wing A, Tower B"
+                      value={formData.wing || ""}
+                      onChange={(e) => handleFormWingChange(e.target.value)}
+                      className="h-10 text-xs"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Street / Landmark</Label>
+                    <Input
+                      placeholder="e.g. Main Road, Near Park"
+                      value={formData.street || ""}
+                      onChange={(e) => handleFormStreetChange(e.target.value)}
+                      className="h-10 text-xs"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -1010,7 +1134,7 @@ export function ChefManagementPage() {
                 </Label>
                 <Input
                   id="chefAddress"
-                  placeholder="e.g. Flat A-101, Green Valley Society, Wakad, Pune"
+                  placeholder="e.g. Flat 101, Wing A, Green Valley Society, Main Road, Wakad, Pune"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="text-xs bg-muted/50 font-medium"
@@ -1019,7 +1143,7 @@ export function ChefManagementPage() {
               </div>
             </div>
 
-            {/* Allocate Delivery Societies (Multi-Select) */}
+            {/* Allocate Delivery Societies with City & Area Filter Suggestions */}
             <div className="space-y-2 p-3.5 rounded-xl bg-muted/40 border border-border">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
@@ -1030,11 +1154,81 @@ export function ChefManagementPage() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Select all societies where this cook is approved to deliver homemade food.
+                Filter by City & Area below to select societies where this cook is approved to deliver.
               </p>
 
+              {/* City and Area Filter Suggestions */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 pb-1">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-muted-foreground">Select City</Label>
+                  <select
+                    value={assignFilterCity}
+                    onChange={(e) => {
+                      setAssignFilterCity(e.target.value);
+                      setAssignFilterArea("all");
+                    }}
+                    className="w-full h-8 px-2.5 rounded-lg border border-input bg-card text-foreground text-xs font-medium cursor-pointer"
+                  >
+                    <option value="all">All Cities</option>
+                    {assignAvailableCities.map((c) => (
+                      <option key={c} value={c}>{toTitleCase(c)}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-muted-foreground">Select Area</Label>
+                  <select
+                    value={assignFilterArea}
+                    onChange={(e) => setAssignFilterArea(e.target.value)}
+                    className="w-full h-8 px-2.5 rounded-lg border border-input bg-card text-foreground text-xs font-medium cursor-pointer"
+                  >
+                    <option value="all">All Areas</option>
+                    {assignAvailableAreas.map((a) => (
+                      <option key={a} value={a}>{toTitleCase(a)}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Select / Deselect Filtered Buttons */}
+              <div className="flex items-center justify-between pt-1 text-xs">
+                <span className="text-[11px] text-muted-foreground">
+                  Showing {filteredAssignableSocieties.length} societies
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const names = filteredAssignableSocieties.map((s) => s.name);
+                      setFormData((prev) => ({
+                        ...prev,
+                        assignedSocieties: Array.from(new Set([...prev.assignedSocieties, ...names])),
+                      }));
+                    }}
+                    className="text-[11px] text-primary font-bold hover:underline cursor-pointer"
+                  >
+                    Select All Filtered
+                  </button>
+                  <span className="text-muted-foreground">•</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const names = filteredAssignableSocieties.map((s) => s.name);
+                      setFormData((prev) => ({
+                        ...prev,
+                        assignedSocieties: prev.assignedSocieties.filter((name) => !names.includes(name)),
+                      }));
+                    }}
+                    className="text-[11px] text-muted-foreground hover:underline cursor-pointer"
+                  >
+                    Deselect Filtered
+                  </button>
+                </div>
+              </div>
+
+              {/* Filtered Societies Multi-Select Grid */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pt-1 pr-1">
-                {societiesList.map((soc) => {
+                {filteredAssignableSocieties.map((soc) => {
                   const isChecked = formData.assignedSocieties.includes(soc.name);
                   const isBase = formData.baseSociety === soc.name;
                   return (
@@ -1049,7 +1243,7 @@ export function ChefManagementPage() {
                       }`}
                     >
                       <div className="flex items-center gap-1.5 truncate">
-                        <span className="truncate">{soc.name}</span>
+                        <span className="truncate">{toTitleCase(soc.name)}</span>
                         {isBase && (
                           <Badge variant="outline" className="text-[9px] py-0 px-1 bg-background shrink-0">
                             Base
@@ -1065,9 +1259,9 @@ export function ChefManagementPage() {
 
             {/* Initial Login Credentials (BRD p. 20) */}
             {(() => {
-              const cleanMob = formData.mobileNumber.replace(/\D/g, "");
+              const cleanMob = String(formData?.mobileNumber || "").replace(/\D/g, "");
               const hasEmail = Boolean(
-                formData.email?.trim() &&
+                formData?.email?.trim() &&
                 formData.email.includes("@") &&
                 formData.email.includes(".")
               );
@@ -1191,8 +1385,10 @@ export function ChefManagementPage() {
                 className="size-12 rounded-full object-cover border"
               />
               <div>
-                <div className="font-bold">{viewingChef?.fullName}</div>
-                <div className="text-xs text-muted-foreground font-normal">{viewingChef?.idCardNumber}</div>
+                <div className="font-bold">{toTitleCase(viewingChef?.fullName)}</div>
+                <div className="text-xs text-muted-foreground font-normal">
+                  Aadhar: {viewingChef?.aadharNumber || viewingChef?.idCardNumber || "—"}
+                </div>
               </div>
             </DialogTitle>
           </DialogHeader>

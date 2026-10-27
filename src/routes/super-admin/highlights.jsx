@@ -156,41 +156,41 @@ export function HighlightsPage() {
       }
     >
       {/* Information Banner (BRD p. 21) */}
-      <div className="p-4 rounded-2xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
-            <Sparkles className="size-5" />
+          <div className="size-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <Sparkles className="size-4.5" />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-foreground">
+            <h4 className="text-xs sm:text-sm font-bold text-foreground">
               Customer Home Screen Slider Configuration
             </h4>
-            <p className="text-xs text-muted-foreground">
-              Exactly 4 banner images are cycled sequentially on customer app launch. Recommended aspect ratio: 2:1 (1080 x 540 px).
+            <p className="text-[11px] text-muted-foreground">
+              4 banner images cycled on customer app launch. Recommended ratio: 2:1 (1080 x 540 px).
             </p>
           </div>
         </div>
-        <Badge variant="outline" className="text-xs font-semibold shrink-0">
+        <Badge variant="outline" className="text-[11px] font-semibold shrink-0">
           Max File Size: 5 MB
         </Badge>
       </div>
 
-      {/* 4 Image Slots Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* 4 Compact Image Slots Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {highlights.map((slot) => (
-          <Card key={slot.slotNumber} className="border-border overflow-hidden flex flex-col justify-between">
-            <CardHeader className="pb-3 border-b border-border/60">
+          <Card key={slot.slotNumber} className="border-border overflow-hidden flex flex-col justify-between shadow-2xs">
+            <CardHeader className="p-3 pb-2.5 border-b border-border/60">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-primary text-primary-foreground font-bold text-xs">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <Badge className="bg-primary text-primary-foreground font-bold text-[10px] py-0 px-1.5">
                     Slot #{slot.slotNumber}
                   </Badge>
-                  <CardTitle className="text-base font-bold">
-                    {slot.title || `Promotional Banner ${slot.slotNumber}`}
+                  <CardTitle className="text-xs font-bold truncate">
+                    {slot.title || `Banner ${slot.slotNumber}`}
                   </CardTitle>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-muted-foreground">Active</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[10px] font-semibold text-muted-foreground">Active</span>
                   <Switch
                     checked={slot.isActive}
                     onCheckedChange={() => handleToggleActive(slot.slotNumber)}
@@ -199,9 +199,9 @@ export function HighlightsPage() {
               </div>
             </CardHeader>
 
-            <CardContent className="p-5 space-y-4 flex-1">
-              {/* Image Preview Box */}
-              <div className="relative aspect-[2/1] w-full rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center group">
+            <CardContent className="p-3 space-y-2.5 flex-1 flex flex-col justify-between">
+              {/* Image Preview Box — Sleek & Compact */}
+              <div className="relative h-28 w-full rounded-lg overflow-hidden border border-border bg-muted flex items-center justify-center group shrink-0">
                 {slot.imageUrl ? (
                   <>
                     <img
@@ -209,7 +209,7 @@ export function HighlightsPage() {
                       alt={slot.title}
                       className="size-full object-cover transition-transform duration-300 group-hover:scale-102"
                     />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1.5 p-1">
                       <label className="cursor-pointer">
                         <input
                           type="file"
@@ -217,9 +217,9 @@ export function HighlightsPage() {
                           className="hidden"
                           onChange={(e) => handleImageFileSelect(slot.slotNumber, e)}
                         />
-                        <Button type="button" size="sm" variant="secondary" className="gap-1.5 pointer-events-none">
-                          <Upload className="size-3.5" />
-                          <span>Change Image</span>
+                        <Button type="button" size="sm" variant="secondary" className="h-7 text-[10px] px-2 gap-1 pointer-events-none">
+                          <Upload className="size-3" />
+                          <span>Change</span>
                         </Button>
                       </label>
                       <Button
@@ -227,62 +227,64 @@ export function HighlightsPage() {
                         size="sm"
                         variant="destructive"
                         onClick={() => handleRemoveImage(slot.slotNumber)}
-                        className="gap-1.5"
+                        className="h-7 text-[10px] px-2 gap-1"
                       >
-                        <Trash2 className="size-3.5" />
-                        <span>Remove</span>
+                        <Trash2 className="size-3" />
+                        <span>Clear</span>
                       </Button>
                     </div>
                   </>
                 ) : (
-                  <label className="flex flex-col items-center justify-center size-full cursor-pointer hover:bg-muted/80 transition-colors p-4 text-center">
+                  <label className="flex flex-col items-center justify-center size-full cursor-pointer hover:bg-muted/80 transition-colors p-2 text-center">
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
                       onChange={(e) => handleImageFileSelect(slot.slotNumber, e)}
                     />
-                    <div className="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2">
-                      <Upload className="size-5" />
+                    <div className="size-8 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-1">
+                      <Upload className="size-4" />
                     </div>
-                    <span className="text-xs font-bold text-foreground">Click to Upload Banner</span>
-                    <span className="text-[10px] text-muted-foreground mt-0.5">PNG, JPG, WebP up to 5MB (1080x540)</span>
+                    <span className="text-[11px] font-bold text-foreground">Upload Banner</span>
+                    <span className="text-[9px] text-muted-foreground mt-0.5">PNG, JPG, WebP (1080x540)</span>
                   </label>
                 )}
               </div>
 
               {/* Text Fields */}
-              <div className="space-y-3">
-                <div className="space-y-1">
-                  <Label htmlFor={`title-${slot.slotNumber}`} className="text-xs">Banner Title</Label>
+              <div className="space-y-2">
+                <div className="space-y-0.5">
+                  <Label htmlFor={`title-${slot.slotNumber}`} className="text-[11px] font-semibold text-muted-foreground">Banner Title</Label>
                   <Input
                     id={`title-${slot.slotNumber}`}
-                    placeholder="e.g. Freshly Cooked Homemade Breakfast"
+                    placeholder="e.g. Fresh Breakfast"
                     value={slot.title}
                     onChange={(e) => handleUpdateText(slot.slotNumber, "title", e.target.value)}
+                    className="h-8 text-xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor={`sub-${slot.slotNumber}`} className="text-xs">Subtitle / Promo Description</Label>
+                <div className="space-y-0.5">
+                  <Label htmlFor={`sub-${slot.slotNumber}`} className="text-[11px] font-semibold text-muted-foreground">Subtitle</Label>
                   <Input
                     id={`sub-${slot.slotNumber}`}
-                    placeholder="e.g. Pure ghee sweets crafted with mother's touch"
+                    placeholder="e.g. Crafted with mother's touch"
                     value={slot.subtitle}
                     onChange={(e) => handleUpdateText(slot.slotNumber, "subtitle", e.target.value)}
+                    className="h-8 text-xs"
                   />
                 </div>
               </div>
 
               {/* Save Slot Button */}
-              <div className="pt-2 flex justify-end">
+              <div className="pt-1 flex justify-end">
                 <Button
                   size="sm"
                   variant="outline"
                   disabled={savingSlot === slot.slotNumber}
                   onClick={() => handleSaveSlot(slot.slotNumber)}
-                  className="gap-1.5 text-xs rounded-xl hover:bg-primary/5 hover:text-primary"
+                  className="h-7 text-[11px] px-2.5 gap-1 rounded-lg hover:bg-primary/5 hover:text-primary cursor-pointer w-full justify-center"
                 >
-                  <Save className="size-3.5" />
+                  <Save className="size-3" />
                   <span>{savingSlot === slot.slotNumber ? "Saving..." : "Save Slot"}</span>
                 </Button>
               </div>

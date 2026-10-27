@@ -59,6 +59,7 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { exportToExcel } from "@/lib/excel-export";
+import { toTitleCase } from "@/lib/utils";
 import {
   subscribeToSocieties,
   createSociety,
@@ -144,7 +145,7 @@ export function SocietyManagementPage() {
 
   // Distinct known areas from existing societies + standard Pune areas
   const allKnownAreas = useMemo(() => {
-    const fromSocieties = societies.map((s) => s.area?.trim()).filter(Boolean);
+    const fromSocieties = societies.map((s) => toTitleCase(s.area?.trim())).filter(Boolean);
     const defaults = [
       "Wakad", "Baner", "Hinjewadi", "Aundh", "Kothrud",
       "Viman Nagar", "Kharadi", "Hadapsar", "Pimple Saudagar",
@@ -280,7 +281,11 @@ export function SocietyManagementPage() {
   const handleSaveSociety = async (e) => {
     e.preventDefault();
 
-    if (!formData.name.trim() || !formData.area.trim() || !formData.city.trim()) {
+    const cleanedName = toTitleCase(formData.name.trim());
+    const cleanedArea = toTitleCase(formData.area.trim());
+    const cleanedCity = toTitleCase(formData.city.trim());
+
+    if (!cleanedName || !cleanedArea || !cleanedCity) {
       toast.error("Please provide Society Name, Area, and City.");
       return;
     }
@@ -289,49 +294,53 @@ export function SocietyManagementPage() {
     const duplicate = societies.find(
       (s) =>
         s.id !== editingSociety?.id &&
-        s.name.trim().toLowerCase() === formData.name.trim().toLowerCase() &&
-        s.area.trim().toLowerCase() === formData.area.trim().toLowerCase()
+        s.name.trim().toLowerCase() === cleanedName.toLowerCase() &&
+        s.area.trim().toLowerCase() === cleanedArea.toLowerCase()
     );
 
     if (duplicate) {
-      toast.error(`A society named "${formData.name}" already exists in ${formData.area}.`);
+      toast.error(`A society named "${cleanedName}" already exists in ${cleanedArea}.`);
       return;
     }
+
+    const payload = {
+      ...formData,
+      name: cleanedName,
+      area: cleanedArea,
+      city: cleanedCity,
+    };
 
     setIsSubmitting(true);
     try {
       if (editingSociety) {
         if (isFirebaseConfigured && !editingSociety.id.startsWith("soc-")) {
-          await updateSociety(editingSociety.id, formData);
-          toast.success(`Society "${formData.name}" updated in Firestore!`);
+          await updateSociety(editingSociety.id, payload);
+          toast.success(`Society "${cleanedName}" updated in Firestore!`);
         } else {
           setSocieties((prev) =>
             prev.map((s) =>
               s.id === editingSociety.id
-                ? { ...s, ...formData, name: formData.name.trim(), area: formData.area.trim(), city: formData.city.trim() }
+                ? { ...s, ...payload }
                 : s
             )
           );
-          toast.success(`Society "${formData.name}" updated successfully.`);
+          toast.success(`Society "${cleanedName}" updated successfully.`);
         }
       } else {
         if (isFirebaseConfigured) {
-          const created = await createSociety(formData);
-          toast.success(`Society "${formData.name}" created with ID ${created.id}!`);
+          const created = await createSociety(payload);
+          toast.success(`Society "${cleanedName}" created with ID ${created.id}!`);
         } else {
           const newSoc = {
-            id: generateSocietyId(formData.name),
-            ...formData,
-            name: formData.name.trim(),
-            area: formData.area.trim(),
-            city: formData.city.trim(),
+            id: generateSocietyId(cleanedName),
+            ...payload,
             totalChefs: 0,
             totalCustomers: 0,
             totalOrders: 0,
             totalRevenue: 0,
           };
           setSocieties((prev) => [newSoc, ...prev]);
-          toast.success(`New Society "${formData.name}" registered successfully.`);
+          toast.success(`New Society "${cleanedName}" registered successfully.`);
         }
       }
       setIsAddModalOpen(false);
@@ -405,9 +414,9 @@ export function SocietyManagementPage() {
       const exportRows = filteredSocieties.map((soc, idx) => ({
         "Sr No": idx + 1,
         "Society ID": soc.id || "",
-        "Society Name": soc.name || "",
-        "Area": soc.area || "",
-        "City": soc.city || "",
+        "Society Name": toTitleCase(soc.name || ""),
+        "Area": toTitleCase(soc.area || ""),
+        "City": toTitleCase(soc.city || ""),
         "Wings Count": soc.wings?.length || soc.numberOfWings || 1,
         "Total Floors": soc.wings?.reduce((a, b) => a + Number(b.floors || 0), 0) || 0,
         "Status": soc.status === "enabled" ? "Enabled" : "Disabled",
@@ -621,7 +630,7 @@ export function SocietyManagementPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-foreground">{soc.name}</span>
+                      <span className="font-bold text-foreground">{toTitleCase(soc.name)}</span>
                       <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
                         {soc.id}
                       </span>
@@ -634,8 +643,8 @@ export function SocietyManagementPage() {
                       {soc.totalCustomers || 0} customers
                     </div>
                   </TableCell>
-                  <TableCell className="font-medium text-foreground">{soc.area}</TableCell>
-                  <TableCell className="text-muted-foreground">{soc.city}</TableCell>
+                  <TableCell className="font-medium text-foreground">{toTitleCase(soc.area)}</TableCell>
+                  <TableCell className="text-muted-foreground">{toTitleCase(soc.city)}</TableCell>
                   <TableCell>
                     <Badge variant="outline" className="gap-1 font-mono text-[11px]">
                       <Layers className="size-3 text-muted-foreground" />
@@ -983,10 +992,10 @@ export function SocietyManagementPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Building2 className="size-5 text-primary" />
-              <span>{viewingSociety?.name}</span>
+              <span>{toTitleCase(viewingSociety?.name)}</span>
             </DialogTitle>
             <DialogDescription>
-              {viewingSociety?.area}, {viewingSociety?.city}
+              {toTitleCase(viewingSociety?.area)}, {toTitleCase(viewingSociety?.city)}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2 text-sm">

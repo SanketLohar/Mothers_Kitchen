@@ -37,3 +37,17 @@ export function formatDateTime(dateString) {
     minute: "2-digit",
   });
 }
+
+/**
+ * Capitalizes each word in a string (Title / Proper Case).
+ * e.g., "wakad" -> "Wakad", "pune" -> "Pune", "green valley" -> "Green Valley"
+ */
+export function toTitleCase(str) {
+  if (!str || typeof str !== "string") return "";
+  return str
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
