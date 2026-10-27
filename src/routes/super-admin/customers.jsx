@@ -192,21 +192,12 @@ export function CustomersPage() {
     <Shell
       title="Customer Database"
       subtitle="View all registered customers with verified society addresses, filter by location and export to Excel."
-      headerAction={
-        <Button
-          onClick={handleExportExcel}
-          variant="outline"
-          className="gap-2 rounded-xl text-emerald-800 border-emerald-300 hover:bg-emerald-50"
-        >
-          <FileSpreadsheet className="size-4 text-emerald-700" />
-          <span>Export to Excel</span>
-        </Button>
-      }
     >
       {/* Filters Bar matching BRD p. 22 */}
       <Card className="border-border">
         <CardContent className="p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Location Dropdowns (Cascading) */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {/* City Dropdown */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">City</label>
@@ -254,29 +245,38 @@ export function CustomersPage() {
                 </SelectContent>
               </Select>
             </div>
+          </div>
 
-            {/* Clear Button */}
-            <div className="flex items-end gap-2">
+          {/* Search Box & Actions (Reset + Export Excel) */}
+          <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
+            <div className="relative flex-1 w-full">
+              <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input
+                placeholder="Search by customer name, mobile number or address..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="pl-9 h-10 w-full rounded-xl bg-card border-border"
+              />
+            </div>
+            <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end">
               <Button
                 variant="outline"
                 onClick={handleClearFilters}
-                className="w-full gap-2 rounded-xl"
+                className="gap-2 h-10 rounded-xl cursor-pointer"
               >
                 <RotateCcw className="size-3.5" />
                 <span>Reset Filters</span>
               </Button>
-            </div>
-          </div>
 
-          {/* Search Box */}
-          <div className="relative pt-1">
-            <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-            <Input
-              placeholder="Search by customer name, mobile number or address..."
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              className="pl-9 h-10"
-            />
+              <Button
+                variant="outline"
+                onClick={handleExportExcel}
+                className="gap-2 h-10 rounded-xl cursor-pointer hover:border-emerald-600 hover:text-emerald-700 transition-colors"
+              >
+                <FileSpreadsheet className="size-4 text-emerald-600" />
+                <span>Export to Excel</span>
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

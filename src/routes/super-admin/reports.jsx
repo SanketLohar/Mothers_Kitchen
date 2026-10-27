@@ -12,6 +12,7 @@ import {
   Download,
   Building2,
   BarChart3,
+  FileSpreadsheet,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -128,64 +129,68 @@ export function StatisticsReportsPage() {
     <Shell
       title="Statistics and Report"
       subtitle="Live revenue, order volume, cook capacity, and society-level analytical insights."
-      headerAction={
-        <Button
-          onClick={handleExportSocietyReport}
-          variant="outline"
-          className="gap-2 rounded-xl text-emerald-800 border-emerald-300 hover:bg-emerald-50 cursor-pointer"
-        >
-          <Download className="size-4" />
-          <span>Export Analytics</span>
-        </Button>
-      }
     >
-      {/* Date Period Filter Bar (BRD p. 23) */}
+      {/* Date Period Filter Bar with Export Action (BRD p. 23) */}
       <Card className="border-border">
         <CardContent className="p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm font-bold text-foreground">
-            <Calendar className="size-4 text-primary" />
-            <span>Reporting Period (Asia/Kolkata):</span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-1.5 bg-muted p-1 rounded-xl">
-            {[
-              { id: "today", label: "Today" },
-              { id: "yesterday", label: "Yesterday" },
-              { id: "this_week", label: "This Week" },
-              { id: "this_month", label: "This Month" },
-              { id: "custom", label: "Custom Date" },
-            ].map((p) => (
-              <button
-                key={p.id}
-                onClick={() => setSelectedPeriod(p.id)}
-                className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                  selectedPeriod === p.id
-                    ? "bg-card text-foreground shadow-xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
-
-          {selectedPeriod === "custom" && (
-            <div className="flex items-center gap-2 text-xs">
-              <input
-                type="date"
-                value={customStartDate}
-                onChange={(e) => setCustomStartDate(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs font-mono"
-              />
-              <span className="text-muted-foreground">to</span>
-              <input
-                type="date"
-                value={customEndDate}
-                onChange={(e) => setCustomEndDate(e.target.value)}
-                className="px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs font-mono"
-              />
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full lg:w-auto">
+            <div className="flex items-center gap-2 text-sm font-bold text-foreground shrink-0">
+              <Calendar className="size-4 text-primary" />
+              <span>Reporting Period (Asia/Kolkata):</span>
             </div>
-          )}
+
+            <div className="flex flex-wrap items-center gap-1.5 bg-muted p-1 rounded-xl">
+              {[
+                { id: "today", label: "Today" },
+                { id: "yesterday", label: "Yesterday" },
+                { id: "this_week", label: "This Week" },
+                { id: "this_month", label: "This Month" },
+                { id: "custom", label: "Custom Date" },
+              ].map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => setSelectedPeriod(p.id)}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    selectedPeriod === p.id
+                      ? "bg-card text-foreground shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+            </div>
+
+            {selectedPeriod === "custom" && (
+              <div className="flex items-center gap-2 text-xs">
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs font-mono"
+                />
+                <span className="text-muted-foreground">to</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="px-2.5 py-1.5 rounded-lg border border-border bg-card text-xs font-mono"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Export Button Placed Near Filters */}
+          <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end shrink-0">
+            <Button
+              onClick={handleExportSocietyReport}
+              variant="outline"
+              className="gap-2 h-10 rounded-xl hover:border-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer"
+            >
+              <FileSpreadsheet className="size-4 text-emerald-600" />
+              <span>Export Analytics</span>
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
