@@ -77,12 +77,53 @@ export function CustomersPage() {
   }, []);
 
   // Extract distinct dynamic filter options from live societies
+  // Extract distinct locations cascading by selectedCity and selectedArea
   const filterOptions = useMemo(() => {
-    const cities = Array.from(new Set(societiesList.map((s) => s.city))).filter(Boolean);
-    const areas = Array.from(new Set(societiesList.map((s) => s.area))).filter(Boolean);
-    const societies = Array.from(new Set(societiesList.map((s) => s.name))).filter(Boolean);
+    const list = societiesList;
+    const cities = Array.from(new Set(list.map((s) => s.city))).filter(Boolean).sort();
+
+    const filteredForArea =
+      selectedCity === "all"
+        ? list
+        : list.filter((s) => (s.city || "").toLowerCase() === selectedCity.toLowerCase());
+    const areas = Array.from(new Set(filteredForArea.map((s) => s.area))).filter(Boolean).sort();
+
+    const filteredForSociety = list.filter((s) => {
+      const matchCity =
+        selectedCity === "all" || (s.city || "").toLowerCase() === selectedCity.toLowerCase();
+      const matchArea =
+        selectedArea === "all" || (s.area || "").toLowerCase() === selectedArea.toLowerCase();
+      return matchCity && matchArea;
+    });
+    const societies = Array.from(new Set(filteredForSociety.map((s) => s.name))).filter(Boolean).sort();
+
     return { cities, areas, societies };
-  }, [societiesList]);
+  }, [societiesList, selectedCity, selectedArea]);
+
+  const handleCityChange = (city) => {
+    setSelectedCity(city);
+    setSelectedArea("all");
+    setSelectedSociety("all");
+    setCurrentPage(1);
+  };
+
+  const handleAreaChange = (area) => {
+    setSelectedArea(area);
+    setSelectedSociety("all");
+    setCurrentPage(1);
+  };
+
+  useEffect(() => {
+    if (selectedArea !== "all" && !filterOptions.areas.includes(selectedArea)) {
+      setSelectedArea("all");
+    }
+  }, [filterOptions.areas, selectedArea]);
+
+  useEffect(() => {
+    if (selectedSociety !== "all" && !filterOptions.societies.includes(selectedSociety)) {
+      setSelectedSociety("all");
+    }
+  }, [filterOptions.societies, selectedSociety]);
 
   // Filtered customer set matching active criteria
   const filteredCustomers = useMemo(() => {
@@ -169,7 +210,7 @@ export function CustomersPage() {
             {/* City Dropdown */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">City</label>
-              <Select value={selectedCity} onValueChange={(val) => { setSelectedCity(val); setCurrentPage(1); }}>
+              <Select value={selectedCity} onValueChange={handleCityChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Cities" />
                 </SelectTrigger>
@@ -185,7 +226,7 @@ export function CustomersPage() {
             {/* Area Dropdown */}
             <div className="space-y-1">
               <label className="text-xs font-semibold text-muted-foreground">Area</label>
-              <Select value={selectedArea} onValueChange={(val) => { setSelectedArea(val); setCurrentPage(1); }}>
+              <Select value={selectedArea} onValueChange={handleAreaChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Areas" />
                 </SelectTrigger>

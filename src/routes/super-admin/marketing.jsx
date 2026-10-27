@@ -90,14 +90,54 @@ export function MarketingPage() {
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [viewingCampaign, setViewingCampaign] = useState(null);
 
-  // Extract distinct locations
+  // Extract distinct locations cascading by selectedCity and selectedArea
   const filterOptions = useMemo(() => {
     const list = societiesList;
-    const cities = Array.from(new Set(list.map((s) => s.city))).filter(Boolean);
-    const areas = Array.from(new Set(list.map((s) => s.area))).filter(Boolean);
-    const societies = Array.from(new Set(list.map((s) => s.name))).filter(Boolean);
+    const cities = Array.from(new Set(list.map((s) => s.city))).filter(Boolean).sort();
+
+    // Cascading areas based on selectedCity
+    const filteredForArea =
+      selectedCity === "all"
+        ? list
+        : list.filter((s) => (s.city || "").toLowerCase() === selectedCity.toLowerCase());
+    const areas = Array.from(new Set(filteredForArea.map((s) => s.area))).filter(Boolean).sort();
+
+    // Cascading societies based on selectedCity AND selectedArea
+    const filteredForSociety = list.filter((s) => {
+      const matchCity =
+        selectedCity === "all" || (s.city || "").toLowerCase() === selectedCity.toLowerCase();
+      const matchArea =
+        selectedArea === "all" || (s.area || "").toLowerCase() === selectedArea.toLowerCase();
+      return matchCity && matchArea;
+    });
+    const societies = Array.from(new Set(filteredForSociety.map((s) => s.name))).filter(Boolean).sort();
+
     return { cities, areas, societies };
-  }, [societiesList]);
+  }, [societiesList, selectedCity, selectedArea]);
+
+  const handleCityChange = (city) => {
+    setSelectedCity(city);
+    setSelectedArea("all");
+    setSelectedSociety("all");
+  };
+
+  const handleAreaChange = (area) => {
+    setSelectedArea(area);
+    setSelectedSociety("all");
+  };
+
+  // Auto-reset invalid selections when options change
+  useEffect(() => {
+    if (selectedArea !== "all" && !filterOptions.areas.includes(selectedArea)) {
+      setSelectedArea("all");
+    }
+  }, [filterOptions.areas, selectedArea]);
+
+  useEffect(() => {
+    if (selectedSociety !== "all" && !filterOptions.societies.includes(selectedSociety)) {
+      setSelectedSociety("all");
+    }
+  }, [filterOptions.societies, selectedSociety]);
 
   // Filtered customer pool
   const filteredCustomers = useMemo(() => {
@@ -225,7 +265,7 @@ export function MarketingPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 <div>
                   <label className="text-[11px] font-semibold text-muted-foreground">City</label>
-                  <Select value={selectedCity} onValueChange={setSelectedCity}>
+                  <Select value={selectedCity} onValueChange={handleCityChange}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue placeholder="City" />
                     </SelectTrigger>
@@ -240,7 +280,7 @@ export function MarketingPage() {
 
                 <div>
                   <label className="text-[11px] font-semibold text-muted-foreground">Area</label>
-                  <Select value={selectedArea} onValueChange={setSelectedArea}>
+                  <Select value={selectedArea} onValueChange={handleAreaChange}>
                     <SelectTrigger className="h-9 text-xs">
                       <SelectValue placeholder="Area" />
                     </SelectTrigger>
