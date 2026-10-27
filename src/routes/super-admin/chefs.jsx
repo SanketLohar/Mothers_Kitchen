@@ -826,7 +826,21 @@ export function ChefManagementPage() {
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-muted-foreground flex items-center gap-1">
+                        {/* Active on App Pill directly below Chef Name */}
+                        <div className="flex items-center gap-2 mt-1">
+                          {chef.isActive ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold shadow-2xs">
+                              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span>Active on App</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-100 border border-zinc-300 text-zinc-700 text-[10px] font-medium">
+                              <span className="size-1.5 rounded-full bg-zinc-400" />
+                              <span>Offline on App</span>
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
                           <MapPin className="size-3" />
                           {toTitleCase(chef.baseSociety) || "No base society"}
                         </div>
@@ -903,10 +917,29 @@ export function ChefManagementPage() {
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{editingChef ? "Edit Chef Profile" : "Add Chef & Provision Login"}</DialogTitle>
-            <DialogDescription>
-              Register a cook, allocate deliverable societies from the society directory, and configure login credentials.
-            </DialogDescription>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <DialogTitle>{editingChef ? "Edit Chef Profile" : "Add Chef & Provision Login"}</DialogTitle>
+                <DialogDescription>
+                  Register a cook, allocate deliverable societies from the society directory, and configure login credentials.
+                </DialogDescription>
+              </div>
+              {editingChef && (
+                <div className="shrink-0 pt-0.5">
+                  {formData.isActive ? (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold shadow-2xs">
+                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Active on App
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 border border-zinc-300 text-zinc-700 text-xs font-semibold">
+                      <span className="size-2 rounded-full bg-zinc-400" />
+                      Offline on App
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
           </DialogHeader>
 
           <form onSubmit={handleSaveChef} className="space-y-4 py-2">
@@ -920,6 +953,26 @@ export function ChefManagementPage() {
                   onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
                   required
                 />
+                {editingChef && (
+                  <div className="flex items-center gap-2 pt-0.5">
+                    {formData.isActive ? (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-bold">
+                        <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Active on App</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-100 border border-zinc-300 text-zinc-700 text-[11px] font-medium">
+                        <span className="size-1.5 rounded-full bg-zinc-400" />
+                        <span>Offline on App</span>
+                      </span>
+                    )}
+                    {formData.isDeactivatedByAdmin && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-100 border border-rose-200 text-rose-800 text-[11px] font-semibold">
+                        Admin Blocked
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">
