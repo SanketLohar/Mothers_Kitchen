@@ -1,0 +1,117 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===============================================================
+    // Mother's Kitchen Security Rules — Role-Based Authorization
+    // ===============================================================
+
+    // Helper: Verify caller is an authoritative Super Admin via Firebase Custom Claims or approved Admin Email
+    function isSuperAdmin() {
+      return request.auth != null && (
+        request.auth.token.role == 'super-admin' || 
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'admin@motherskitchen.com'
+      );
+    }
+
+    // Helper: Verify caller is an authenticated user
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Verify caller is the specific chef
+    function isOwnerChef(chefId) {
+      return isAuthenticated() && request.auth.uid == chefId;
+    }
+
+    // Helper: Verify caller is the specific customer
+    function isOwnerCustomer(customerId) {
+      return isAuthenticated() && request.auth.uid == customerId;
+    }
+
+    // 1. Societies Collection
+    // Public read needed so customer and cook registration can fetch active cities/areas/societies
+    // Only Super Admin can create, modify, or toggle society enable/disable status
+    match /societies/{societyId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+
+      // Chefs subcollection under each society
+      match /chefs/{chefId} {
+        allow read: if true;
+        allow write: if isSuperAdmin();
+      }
+    }
+
+    // 2. Chefs Collection
+    // Public read for basic cook directory in customer app (only enabled chefs)
+    // Only Super Admin can register new chefs, edit base address, or toggle enabled/disabled status
+    // Chefs can only toggle their daily active status and daily deliverable availability
+    match /chefs/{chefId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (
+        isOwnerChef(chefId) && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDailyActive', 'activeDeliverableSocieties', 'lastActiveToggleAt'])
+      );
+    }
+
+    // 3. Customers Collection
+    // Customer can read and update their own profile; Super Admin can read all
+    match /customers/{customerId} {
+      allow read: if isSuperAdmin() || isOwnerCustomer(customerId);
+      allow create: if isAuthenticated() && request.auth.uid == customerId;
+      allow update: if isSuperAdmin() || isOwnerCustomer(customerId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // 4. Customer App Highlights (4 Promotional Banners)
+    // Public read on mobile app home carousel; only Super Admin can write
+    match /highlights/{highlightId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    // 5. Food Categories & Items
+    // Read by authenticated customers; chefs can manage items they prepare; Super Admin full access
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
+
+    match /food_items/{itemId} {
+      allow read: if true;
+      allow create, update: if isSuperAdmin() || (isAuthenticated() && request.resource.data.chefId == request.auth.uid);
+      allow delete: if isSuperAdmin() || (isAuthenticated() && resource.data.chefId == request.auth.uid);
+    }
+
+    // 6. Orders Collection
+    // Customer who placed order, assigned Chef, or Super Admin can read
+    match /orders/{orderId} {
+      allow read: if isSuperAdmin() || (
+        isAuthenticated() && (
+          request.auth.uid == resource.data.customerId || 
+          request.auth.uid == resource.data.chefId
+        )
+      );
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      allow update: if isSuperAdmin() || (
+        isAuthenticated() && request.auth.uid == resource.data.chefId &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'rejectionReason'])
+      );
+      allow delete: if isSuperAdmin();
+    }
+
+    // 7. Marketing Campaigns Collection
+    // Strictly restricted to Super Admin
+    match /campaigns/{campaignId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    // Default deny all other collections
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

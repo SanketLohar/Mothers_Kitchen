@@ -1,0 +1,159 @@
+@import "tailwindcss" source(none);
+@source "../src";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans", "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-soft: var(--primary-soft);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+}
+
+:root {
+  --radius: 0.875rem;
+
+  /* ── Warm Cream Background (matching app's warm white) ─── */
+  --background: #fdf8f3;
+  --foreground: #2c1810;
+
+  --card: #ffffff;
+  --card-foreground: #2c1810;
+
+  --popover: #ffffff;
+  --popover-foreground: #2c1810;
+
+  /* ── Primary: Warm Amber-Orange (exact app orange #F97316 family) ── */
+  --primary: #e8650a;
+  --primary-foreground: #ffffff;
+  --primary-soft: #fef0e6;
+
+  /* ── Secondary: Warm Cream/Sand ── */
+  --secondary: #fef3e8;
+  --secondary-foreground: #7c3a1a;
+
+  /* ── Muted: Warm Oat ── */
+  --muted: #fdf0e4;
+  --muted-foreground: #9b6a4a;
+
+  /* ── Accent: Soft Peach ── */
+  --accent: #fde8d4;
+  --accent-foreground: #c44e0a;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+
+  --info: #0284c7;
+  --info-foreground: #ffffff;
+
+  /* ── Borders: Warm Tan ── */
+  --border: #f0d9c4;
+  --input: #f0d9c4;
+  --ring: #e8650a;
+
+  /* ── Sidebar: Deep Warm Brown (matches app's dark header gradient) ── */
+  --sidebar: #3d1a08;
+  --sidebar-foreground: #fde8d4;
+  --sidebar-primary: #e8650a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #5c2810;
+  --sidebar-accent-foreground: #fde8d4;
+  --sidebar-border: #4e2210;
+  --sidebar-ring: #e8650a;
+
+  /* ── Charts: Food-warm palette ── */
+  --chart-1: #e8650a;
+  --chart-2: #d97706;
+  --chart-3: #f59e0b;
+  --chart-4: #dc2626;
+  --chart-5: #7c3a1a;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--background);
+  color: var(--foreground);
+}
+
+/* Glass & Card Elevation Utility */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+.subtle-shadow {
+  box-shadow: 0 1px 3px 0 rgba(180, 80, 20, 0.06), 0 1px 2px -1px rgba(180, 80, 20, 0.04);
+}
+
+.card-shadow {
+  box-shadow: 0 4px 6px -1px rgba(180, 80, 20, 0.07), 0 2px 4px -2px rgba(180, 80, 20, 0.05);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #f0c4a0;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #e8a070;
+}

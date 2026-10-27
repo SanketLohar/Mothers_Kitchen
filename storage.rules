@@ -1,0 +1,48 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper: Super Admin Verification via Token Claims or approved Admin Email
+    function isSuperAdmin() {
+      return request.auth != null && (
+        request.auth.token.role == 'super-admin' || 
+        request.auth.token.admin == true ||
+        request.auth.token.email == 'admin@motherskitchen.com'
+      );
+    }
+
+    // Helper: Verify image format and maximum file size (5 MB)
+    function isValidImage() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // 1. Highlights Promotional Banners (1080x540 px)
+    // Public read for customer app; Super Admin write
+    match /highlights/{fileName} {
+      allow read: if true;
+      allow write: if isSuperAdmin() && isValidImage();
+    }
+
+    // 2. Chef Photos & ID Card Documents
+    // Authenticated read; Super Admin write
+    match /chefs/{chefId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if isSuperAdmin() && isValidImage();
+    }
+
+    // 3. Marketing Campaign Images
+    // Public read; Super Admin write
+    match /campaigns/{campaignId}/{fileName} {
+      allow read: if true;
+      allow write: if isSuperAdmin() && isValidImage();
+    }
+
+    // 4. Chef Food Item Images
+    // Public read; Author chef or Super Admin write
+    match /food_items/{chefId}/{fileName} {
+      allow read: if true;
+      allow write: if (request.auth != null && (request.auth.uid == chefId || isSuperAdmin())) && isValidImage();
+    }
+  }
+}
