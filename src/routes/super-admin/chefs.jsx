@@ -978,13 +978,19 @@ export function ChefManagementPage() {
               </TableRow>
             ) : (
               filteredChefs.map((chef, idx) => (
-                <TableRow key={chef.id} className={chef.isDeactivatedByAdmin ? "bg-rose-50/30" : ""}>
+                <TableRow
+                  key={chef.id}
+                  className={`cursor-pointer transition-colors hover:bg-muted/60 ${
+                    chef.isDeactivatedByAdmin ? "bg-rose-50/30" : ""
+                  }`}
+                  onClick={() => setViewingChef(chef)}
+                >
                   <TableCell className="text-center font-bold text-muted-foreground">
                     {idx + 1}
                   </TableCell>
                   <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="relative shrink-0">
+                    <div className="flex items-center gap-3 group/chef">
+                      <div className="relative shrink-0 transition-transform group-hover/chef:scale-105">
                         <ChefAvatar
                           photoUrl={chef.photoUrl}
                           name={chef.fullName}
@@ -1000,7 +1006,9 @@ export function ChefManagementPage() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-bold text-foreground">{toTitleCase(chef.fullName)}</span>
+                          <span className="font-bold text-foreground group-hover/chef:text-primary group-hover/chef:underline underline-offset-2 transition-colors">
+                            {toTitleCase(chef.fullName)}
+                          </span>
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
                             {chef.id}
                           </span>
@@ -1048,7 +1056,8 @@ export function ChefManagementPage() {
                           type="button"
                           title="Copy Mobile & Password"
                           className="text-muted-foreground hover:text-primary transition-colors p-0.5"
-                          onClick={() => {
+                          onClick={(e) => {
+                            e.stopPropagation();
                             const cred = `Chef Login:\nMobile: ${chef.mobileNumber}\nPassword: ${chef.defaultPassword || chef.password}`;
                             navigator.clipboard.writeText(cred);
                             toast.success("Credentials copied for WhatsApp!");
@@ -1062,13 +1071,13 @@ export function ChefManagementPage() {
                   <TableCell className="max-w-xs text-xs text-muted-foreground truncate" title={chef.address}>
                     {chef.address || "—"}
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => setViewingChef(chef)}
-                        title="View details"
+                        title="View profile"
                       >
                         <Eye className="size-4 text-muted-foreground" />
                       </Button>
@@ -1709,7 +1718,7 @@ export function ChefManagementPage() {
 
       {/* View Chef Profile Modal */}
       <Dialog open={Boolean(viewingChef)} onOpenChange={(open) => !open && setViewingChef(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <ChefAvatar
@@ -1719,9 +1728,14 @@ export function ChefManagementPage() {
                 textSize="text-sm"
               />
               <div>
-                <div className="font-bold">{toTitleCase(viewingChef?.fullName)}</div>
+                <div className="flex items-center gap-2">
+                  <span className="font-bold text-base">{toTitleCase(viewingChef?.fullName)}</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
+                    {viewingChef?.id}
+                  </span>
+                </div>
                 <div className="text-xs text-muted-foreground font-normal">
-                  Aadhar: {viewingChef?.aadharNumber || viewingChef?.idCardNumber || "—"}
+                  Aadhar / ID: {viewingChef?.aadharNumber || viewingChef?.idCardNumber || "—"}
                 </div>
               </div>
             </DialogTitle>
@@ -1791,7 +1805,23 @@ export function ChefManagementPage() {
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Base Society:</span>
-              <span className="font-semibold">{viewingChef?.baseSociety}</span>
+              <span className="font-semibold">{toTitleCase(viewingChef?.baseSociety)}</span>
+            </div>
+            {(viewingChef?.flatNumber || viewingChef?.wing || viewingChef?.floor) && (
+              <div className="flex justify-between border-b pb-2">
+                <span className="text-muted-foreground">Residence Flat / Wing:</span>
+                <span className="font-semibold text-right">
+                  {viewingChef?.flatNumber ? `Flat ${viewingChef.flatNumber}` : ""}
+                  {viewingChef?.wing ? `, Wing ${toTitleCase(viewingChef.wing)}` : ""}
+                  {viewingChef?.floor ? `, Floor ${viewingChef.floor}` : ""}
+                </span>
+              </div>
+            )}
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-muted-foreground">Location (City / Area):</span>
+              <span className="font-semibold">
+                {toTitleCase(viewingChef?.city || "")}{viewingChef?.area ? ` / ${toTitleCase(viewingChef?.area)}` : ""}
+              </span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Complete Address:</span>
@@ -1799,17 +1829,42 @@ export function ChefManagementPage() {
             </div>
             <div className="space-y-1 pt-1">
               <span className="text-xs font-bold text-muted-foreground uppercase">
-                Admin Allocated Delivery Societies:
+                Admin Allocated Delivery Societies ({viewingChef?.assignedSocieties?.length || 0}):
               </span>
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {viewingChef?.assignedSocieties?.map((s, i) => (
-                  <Badge key={i} variant="outline">{s}</Badge>
-                ))}
+                {viewingChef?.assignedSocieties?.length ? (
+                  viewingChef.assignedSocieties.map((s, i) => (
+                    <Badge key={i} variant="outline" className="text-xs py-1 px-2 font-medium">
+                      {toTitleCase(s)}
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">None allocated</span>
+                )}
               </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewingChef(null)}>Close</Button>
+          <DialogFooter className="flex sm:justify-between items-center gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                const target = viewingChef;
+                setViewingChef(null);
+                handleOpenEditModal(target);
+              }}
+              className="gap-1.5 rounded-xl text-xs font-semibold cursor-pointer"
+            >
+              <Edit2 className="size-3.5" />
+              Edit Profile
+            </Button>
+            <Button
+              variant="default"
+              onClick={() => setViewingChef(null)}
+              className="rounded-xl text-xs font-semibold px-5 cursor-pointer"
+            >
+              Close
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
