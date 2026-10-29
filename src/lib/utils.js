@@ -45,9 +45,6 @@ export function formatDateTime(dateString) {
 export function toTitleCase(str) {
   if (!str || typeof str !== "string") return "";
   return str
-    .trim()
     .toLowerCase()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+    .replace(/(?:^|\s|-|\/)[a-z]/g, (match) => match.toUpperCase());
 }

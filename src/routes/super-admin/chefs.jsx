@@ -181,20 +181,28 @@ export function ChefManagementPage() {
 
   // Modal Form Location Options (cascading)
   const formAvailableCities = useMemo(() => {
-    return Array.from(new Set(societiesList.map((s) => s.city).filter(Boolean)));
+    let extra = [];
+    try {
+      const stored = localStorage.getItem("mk_custom_cities");
+      if (stored) extra = JSON.parse(stored);
+    } catch {
+      // ignore
+    }
+    const combined = [...societiesList.map((s) => s.city), ...extra].filter(Boolean);
+    return Array.from(new Set(combined.map((c) => toTitleCase(c))));
   }, [societiesList]);
 
   const formAvailableAreas = useMemo(() => {
     const list = formData.city
-      ? societiesList.filter((s) => s.city === formData.city)
+      ? societiesList.filter((s) => (s.city || "").toLowerCase() === (formData.city || "").toLowerCase())
       : societiesList;
-    return Array.from(new Set(list.map((s) => s.area).filter(Boolean)));
+    return Array.from(new Set(list.map((s) => toTitleCase(s.area)).filter(Boolean)));
   }, [societiesList, formData.city]);
 
   const formAvailableSocieties = useMemo(() => {
     return societiesList.filter((s) => {
-      const matchCity = !formData.city || s.city === formData.city;
-      const matchArea = !formData.area || s.area === formData.area;
+      const matchCity = !formData.city || (s.city || "").toLowerCase() === (formData.city || "").toLowerCase();
+      const matchArea = !formData.area || (s.area || "").toLowerCase() === (formData.area || "").toLowerCase();
       return matchCity && matchArea;
     });
   }, [societiesList, formData.city, formData.area]);
@@ -202,13 +210,15 @@ export function ChefManagementPage() {
   // Selected base society object from store
   const currentBaseSocietyObj = useMemo(() => {
     return societiesList.find(
-      (s) => s.name === formData.baseSociety || s.id === formData.baseSociety
+      (s) =>
+        (s.name || "").toLowerCase() === (formData.baseSociety || "").toLowerCase() ||
+        (s.id || "").toLowerCase() === (formData.baseSociety || "").toLowerCase()
     );
   }, [societiesList, formData.baseSociety]);
 
   // Available wings under selected society
   const availableWingsForSociety = useMemo(() => {
-    if (!currentBaseSocietyObj) return [];
+    if (!currentBaseSocietyObj) return [{ name: "A", floors: 10 }];
     if (currentBaseSocietyObj.wings && currentBaseSocietyObj.wings.length > 0) {
       return currentBaseSocietyObj.wings;
     }
@@ -236,29 +246,54 @@ export function ChefManagementPage() {
   };
 
   const handleFormCityChange = (newCity) => {
+    const areasInCity = societiesList
+      .filter((s) => (s.city || "").toLowerCase() === newCity.toLowerCase())
+      .map((s) => toTitleCase(s.area))
+      .filter(Boolean);
+    const uniqueAreas = Array.from(new Set(areasInCity));
+    const newArea = uniqueAreas[0] || "";
+
+    const socsInArea = societiesList.filter(
+      (s) =>
+        (s.city || "").toLowerCase() === newCity.toLowerCase() &&
+        (s.area || "").toLowerCase() === newArea.toLowerCase()
+    );
+    const firstSoc = socsInArea[0];
+    const newSocName = firstSoc?.name || "";
+    const firstWing = firstSoc?.wings?.[0]?.name ? toTitleCase(firstSoc.wings[0].name) : "A";
+    const firstFloor = "1";
+
     setFormData((prev) => ({
       ...prev,
       city: newCity,
-      area: "",
-      baseSociety: "",
-      flatNumber: "",
-      floor: "",
-      wing: "",
-      address: "",
-      assignedSocieties: [],
+      area: newArea,
+      baseSociety: newSocName,
+      wing: firstWing,
+      floor: firstFloor,
+      address: updateFormattedAddress(prev.flatNumber, firstFloor, firstWing, newSocName, newArea, newCity),
+      assignedSocieties: newSocName ? [newSocName] : [],
     }));
   };
 
   const handleFormAreaChange = (newArea) => {
+    const socsInArea = societiesList.filter(
+      (s) =>
+        (s.city || "").toLowerCase() === (formData.city || "").toLowerCase() &&
+        (s.area || "").toLowerCase() === newArea.toLowerCase()
+    );
+    const firstSoc = socsInArea[0];
+    const newSocName = firstSoc?.name || "";
+    const firstWing = firstSoc?.wings?.[0]?.name ? toTitleCase(firstSoc.wings[0].name) : "A";
+    const firstFloor = "1";
+
     setFormData((prev) => ({
       ...prev,
       area: newArea,
-      baseSociety: "",
-      flatNumber: "",
-      floor: "",
-      wing: "",
-      address: "",
-      assignedSocieties: [],
+      baseSociety: newSocName,
+      wing: firstWing,
+      floor: firstFloor,
+      address: updateFormattedAddress(prev.flatNumber, firstFloor, firstWing, newSocName, newArea, prev.city),
+      assignedSocieties: newSocName ? [newSocName] : [],
     }));
   };
 
@@ -267,6 +302,7 @@ export function ChefManagementPage() {
     const city = found?.city || formData.city;
     const area = found?.area || formData.area;
     const firstWing = found?.wings?.[0]?.name ? toTitleCase(found.wings[0].name) : "A";
+    const firstFloor = "1";
 
     setFormData((prev) => ({
       ...prev,
@@ -274,8 +310,8 @@ export function ChefManagementPage() {
       area,
       baseSociety: newSoc,
       wing: firstWing,
-      floor: "1",
-      address: updateFormattedAddress(prev.flatNumber, "1", firstWing, newSoc, area, city),
+      floor: firstFloor,
+      address: updateFormattedAddress(prev.flatNumber, firstFloor, firstWing, newSoc, area, city),
       // ONLY base society should be selected!
       assignedSocieties: newSoc ? [newSoc] : [],
     }));
@@ -335,21 +371,40 @@ export function ChefManagementPage() {
 
   const handleOpenAddModal = () => {
     setEditingChef(null);
+
+    // Auto-select first valid city, area, society, wing, floor
+    const defaultCity = formAvailableCities[0] || "Pune";
+    const areasInCity = societiesList
+      .filter((s) => (s.city || "").toLowerCase() === defaultCity.toLowerCase())
+      .map((s) => toTitleCase(s.area))
+      .filter(Boolean);
+    const uniqueAreas = Array.from(new Set(areasInCity));
+    const defaultArea = uniqueAreas[0] || "";
+    const socsInArea = societiesList.filter(
+      (s) =>
+        (s.city || "").toLowerCase() === defaultCity.toLowerCase() &&
+        (s.area || "").toLowerCase() === defaultArea.toLowerCase()
+    );
+    const firstSoc = socsInArea[0] || societiesList[0];
+    const defaultSocName = firstSoc?.name || "";
+    const defaultWing = firstSoc?.wings?.[0]?.name ? toTitleCase(firstSoc.wings[0].name) : "A";
+    const defaultFloor = "1";
+
     setFormData({
       fullName: "",
       email: "",
       mobileNumber: "",
       photoUrl: "",
       idCardNumber: "",
-      city: "",
-      area: "",
-      baseSociety: "",
+      city: defaultCity,
+      area: defaultArea,
+      baseSociety: defaultSocName,
       flatNumber: "",
-      floor: "",
-      wing: "",
+      floor: defaultFloor,
+      wing: defaultWing,
       street: "",
-      address: "",
-      assignedSocieties: [],
+      address: updateFormattedAddress("", defaultFloor, defaultWing, defaultSocName, defaultArea, defaultCity),
+      assignedSocieties: defaultSocName ? [defaultSocName] : [],
       defaultPassword: "123456",
       isDeactivatedByAdmin: false,
       isActive: true,
@@ -364,9 +419,11 @@ export function ChefManagementPage() {
     const foundSoc = societiesList.find(
       (s) => s.name === chef.baseSociety || s.id === chef.baseSociety
     );
-    const chefCity = toTitleCase(foundSoc?.city || chef.city || "");
+    const chefCity = toTitleCase(foundSoc?.city || chef.city || formAvailableCities[0] || "");
     const chefArea = toTitleCase(foundSoc?.area || chef.area || "");
     const chefBaseSoc = toTitleCase(chef.baseSociety || foundSoc?.name || "");
+    const chefWing = chef.wing || (foundSoc?.wings?.[0]?.name ? toTitleCase(foundSoc.wings[0].name) : "A");
+    const chefFloor = chef.floor || "1";
 
     setFormData({
       fullName: toTitleCase(chef.fullName || chef.name || ""),
@@ -378,10 +435,10 @@ export function ChefManagementPage() {
       area: chefArea,
       baseSociety: chefBaseSoc,
       flatNumber: chef.flatNumber || "",
-      floor: chef.floor || "",
-      wing: chef.wing || "",
+      floor: chefFloor,
+      wing: chefWing,
       street: chef.street || "",
-      address: chef.address || "",
+      address: chef.address || updateFormattedAddress(chef.flatNumber, chefFloor, chefWing, chefBaseSoc, chefArea, chefCity),
       assignedSocieties: chef.assignedSocieties || (chefBaseSoc ? [chefBaseSoc] : []),
       defaultPassword: "••••••••",
       isDeactivatedByAdmin: Boolean(chef.isDeactivatedByAdmin),
@@ -1142,7 +1199,6 @@ export function ChefManagementPage() {
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                     required
                   >
-                    <option value="">Select Stored City</option>
                     {formAvailableCities.map((ct) => (
                       <option key={ct} value={ct}>
                         {toTitleCase(ct)}
@@ -1159,7 +1215,6 @@ export function ChefManagementPage() {
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                     required
                   >
-                    <option value="">Select Area in {toTitleCase(formData.city) || "City"}</option>
                     {formAvailableAreas.map((ar) => (
                       <option key={ar} value={ar}>
                         {toTitleCase(ar)}
@@ -1179,9 +1234,6 @@ export function ChefManagementPage() {
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                     required
                   >
-                    {!formData.baseSociety && (
-                      <option value="">Select Base Society</option>
-                    )}
                     {formAvailableSocieties.map((soc) => (
                       <option key={soc.id} value={soc.name}>
                         {toTitleCase(soc.name)}
@@ -1214,7 +1266,6 @@ export function ChefManagementPage() {
                       className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                       required
                     >
-                      <option value="">Select Floor</option>
                       {availableFloorsForWing.map((fl) => (
                         <option key={fl} value={fl}>
                           Floor {fl}
@@ -1232,7 +1283,6 @@ export function ChefManagementPage() {
                       className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                       required
                     >
-                      <option value="">Select Wing</option>
                       {availableWingsForSociety.map((w) => (
                         <option key={w.name} value={toTitleCase(w.name)}>
                           Wing {toTitleCase(w.name)}
@@ -1442,15 +1492,7 @@ export function ChefManagementPage() {
 
             {/* Initial Login Credentials (BRD p. 20) */}
             {(() => {
-              const cleanMob = String(formData?.mobileNumber || "").replace(/\D/g, "");
-              const hasEmail = Boolean(
-                formData?.email?.trim() &&
-                formData.email.includes("@") &&
-                formData.email.includes(".")
-              );
-              const authLoginDisplay = hasEmail
-                ? formData.email.trim().toLowerCase()
-                : (cleanMob ? `${cleanMob}@motherskitchen.com` : "Enter mobile or email above");
+              const displayMobile = formData?.mobileNumber ? String(formData.mobileNumber).trim() : "";
 
               return (
                 <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 space-y-3">
@@ -1460,27 +1502,25 @@ export function ChefManagementPage() {
                       <span>Chef Mobile App Login Credentials</span>
                     </div>
                     <Badge variant="outline" className="text-[10px] bg-background font-semibold">
-                      {hasEmail ? "Real Email Priority" : "Mobile Synthetic"}
+                      Mobile Login
                     </Badge>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs">Firebase Auth Login ID</Label>
+                        <Label className="text-xs">Chef Mobile Login ID</Label>
                         <span className="text-[10px] text-primary font-semibold">
-                          {hasEmail ? "Using Real Email" : "Using Mobile"}
+                          Mobile Number
                         </span>
                       </div>
                       <Input
-                        value={authLoginDisplay}
+                        value={displayMobile || "Enter mobile number above"}
                         disabled
-                        className="text-xs bg-muted font-mono"
+                        className="text-xs bg-muted font-mono font-semibold"
                       />
                       <span className="text-[10px] text-muted-foreground block">
-                        {hasEmail
-                          ? "Using entered Email ID for Auth."
-                          : "No email provided: auto-generated from Mobile Number."}
+                        Chef logs into mobile app directly using their registered Mobile Number.
                       </span>
                     </div>
                     <div className="space-y-1">
@@ -1504,7 +1544,7 @@ export function ChefManagementPage() {
                       Chef Mobile Login Flow:
                     </div>
                     <p>
-                      The chef can log in using their <strong>Mobile Number</strong> (or <strong>Email ID</strong>) and this <strong>Password</strong>.
+                      The chef logs in directly using their registered <strong>Mobile Number</strong> and this <strong>Password</strong>.
                       The Super Admin session remains 100% active while credentials are saved in Firestore and provisioned in Firebase Auth.
                     </p>
                   </div>

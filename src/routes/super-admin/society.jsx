@@ -18,6 +18,7 @@ import {
   Filter,
   FileSpreadsheet,
   Minus,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,13 +144,36 @@ export function SocietyManagementPage() {
   });
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [showAreaSuggestions, setShowAreaSuggestions] = useState(false);
+  const [customCities, setCustomCities] = useState(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("mk_custom_cities");
+        return saved ? JSON.parse(saved) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
 
-  // Distinct known cities from existing societies + standard defaults
+  const addCustomCity = (cityName) => {
+    const formatted = toTitleCase(cityName?.trim() || "");
+    if (!formatted) return;
+    setCustomCities((prev) => {
+      const next = Array.from(new Set([...prev, formatted]));
+      if (typeof window !== "undefined") {
+        localStorage.setItem("mk_custom_cities", JSON.stringify(next));
+      }
+      return next;
+    });
+  };
+
+  // Distinct known cities from existing societies + custom added cities + standard defaults
   const allKnownCities = useMemo(() => {
     const fromSocieties = societies.map((s) => toTitleCase(s.city?.trim())).filter(Boolean);
     const defaults = ["Pune", "Mumbai", "Pimpri-Chinchwad", "Nagpur", "Nashik", "Thane"];
-    return Array.from(new Set([...fromSocieties, ...defaults])).sort();
-  }, [societies]);
+    return Array.from(new Set([...fromSocieties, ...customCities, ...defaults])).sort();
+  }, [societies, customCities]);
 
   const filteredCitySuggestions = useMemo(() => {
     const input = (formData.city || "").trim().toLowerCase();
@@ -324,6 +348,8 @@ export function SocietyManagementPage() {
       name: toTitleCase(String(w.name || "").trim()),
       floors: Math.max(1, parseInt(w.floors, 10) || 1),
     }));
+
+    addCustomCity(cleanedCity);
 
     const payload = {
       ...formData,
@@ -743,9 +769,9 @@ export function SocietyManagementPage() {
                 <Input
                   placeholder="e.g. Pune, Mumbai, Nagpur..."
                   value={formData.city}
-                  onFocus={() => setShowCitySuggestions(true)}
+                  onClick={() => setShowCitySuggestions(true)}
                   onChange={(e) => {
-                    setFormData({ ...formData, city: e.target.value });
+                    setFormData({ ...formData, city: toTitleCase(e.target.value) });
                     setShowCitySuggestions(true);
                   }}
                   onBlur={() => {
@@ -753,13 +779,17 @@ export function SocietyManagementPage() {
                   }}
                   required
                   autoComplete="off"
-                  list="city-datalist"
+                  className="pr-9"
                 />
-                <datalist id="city-datalist">
-                  {allKnownCities.map((city) => (
-                    <option key={city} value={city} />
-                  ))}
-                </datalist>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowCitySuggestions((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-1"
+                  title="Toggle city suggestions"
+                >
+                  <ChevronDown className={`size-4 transition-transform duration-200 ${showCitySuggestions ? "rotate-180" : ""}`} />
+                </button>
 
                 {/* Floating Interactive City Suggestions Dropdown */}
                 {showCitySuggestions && (
@@ -792,9 +822,10 @@ export function SocietyManagementPage() {
                           className="w-full text-left px-3 py-2.5 text-xs bg-primary/10 text-primary font-bold hover:bg-primary/20 transition-colors flex items-center gap-2 cursor-pointer border-t border-primary/20"
                           onMouseDown={() => {
                             const newCity = toTitleCase(formData.city.trim());
+                            addCustomCity(newCity);
                             setFormData({ ...formData, city: newCity });
                             setShowCitySuggestions(false);
-                            toast.success(`New city "${newCity}" added!`);
+                            toast.success(`New city "${newCity}" added to suggestions!`);
                           }}
                         >
                           <Plus className="size-3.5" />
@@ -818,23 +849,27 @@ export function SocietyManagementPage() {
                 <Input
                   placeholder="e.g. Wakad, Baner, Hinjewadi"
                   value={formData.area}
-                  onFocus={() => setShowAreaSuggestions(true)}
+                  onClick={() => setShowAreaSuggestions(true)}
                   onChange={(e) => {
-                    setFormData({ ...formData, area: e.target.value });
+                    setFormData({ ...formData, area: toTitleCase(e.target.value) });
                     setShowAreaSuggestions(true);
                   }}
                   onBlur={() => {
-                    setTimeout(() => setShowAreaSuggestions(false), 200);
+                    setTimeout(() => setShowAreaSuggestions(false), 250);
                   }}
                   required
                   autoComplete="off"
-                  list="area-datalist"
+                  className="pr-9"
                 />
-                <datalist id="area-datalist">
-                  {allKnownAreas.map((area) => (
-                    <option key={area} value={area} />
-                  ))}
-                </datalist>
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowAreaSuggestions((prev) => !prev)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-1"
+                  title="Toggle area suggestions"
+                >
+                  <ChevronDown className={`size-4 transition-transform duration-200 ${showAreaSuggestions ? "rotate-180" : ""}`} />
+                </button>
 
                 {/* Floating Interactive Suggestions Dropdown */}
                 {showAreaSuggestions && filteredAreaSuggestions.length > 0 && (
@@ -885,8 +920,10 @@ export function SocietyManagementPage() {
               <Input
                 placeholder="e.g. Green Valley Society"
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, name: toTitleCase(e.target.value) })}
+                onBlur={() => setFormData((prev) => ({ ...prev, name: toTitleCase(prev.name.trim()) }))}
                 required
+                autoComplete="off"
               />
               {formData.name.trim() && (
                 <div className="flex items-center gap-2 text-xs text-muted-foreground pt-0.5">
