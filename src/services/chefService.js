@@ -320,6 +320,7 @@ export async function updateChef(chefId, data) {
     updatePayload.isActive = Boolean(data.isActive);
   }
   if (data.flatNumber !== undefined) updatePayload.flatNumber = data.flatNumber;
+  if (data.floor !== undefined) updatePayload.floor = data.floor;
   if (data.wing !== undefined) updatePayload.wing = data.wing;
   if (data.street !== undefined) updatePayload.street = data.street;
   if (data.city !== undefined) updatePayload.city = data.city;

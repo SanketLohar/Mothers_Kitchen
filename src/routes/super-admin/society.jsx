@@ -134,14 +134,28 @@ export function SocietyManagementPage() {
 
   // Form State for Add / Edit Society (BRD p. 18 hierarchy)
   const [formData, setFormData] = useState({
-    city: "Pune",
+    city: "",
     area: "",
     name: "",
     numberOfWings: 1,
     wings: [{ name: "A", floors: 10 }],
     status: "enabled",
   });
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [showAreaSuggestions, setShowAreaSuggestions] = useState(false);
+
+  // Distinct known cities from existing societies + standard defaults
+  const allKnownCities = useMemo(() => {
+    const fromSocieties = societies.map((s) => toTitleCase(s.city?.trim())).filter(Boolean);
+    const defaults = ["Pune", "Mumbai", "Pimpri-Chinchwad", "Nagpur", "Nashik", "Thane"];
+    return Array.from(new Set([...fromSocieties, ...defaults])).sort();
+  }, [societies]);
+
+  const filteredCitySuggestions = useMemo(() => {
+    const input = (formData.city || "").trim().toLowerCase();
+    if (!input) return allKnownCities.slice(0, 10);
+    return allKnownCities.filter((c) => c.toLowerCase().includes(input));
+  }, [allKnownCities, formData.city]);
 
   // Distinct known areas from existing societies + standard Pune areas
   const allKnownAreas = useMemo(() => {
@@ -163,9 +177,10 @@ export function SocietyManagementPage() {
 
   const handleOpenAddModal = () => {
     setEditingSociety(null);
+    setShowCitySuggestions(false);
     setShowAreaSuggestions(false);
     setFormData({
-      city: "Pune",
+      city: "",
       area: "",
       name: "",
       numberOfWings: 1,
@@ -177,15 +192,16 @@ export function SocietyManagementPage() {
 
   const handleOpenEditModal = (soc) => {
     setEditingSociety(soc);
+    setShowCitySuggestions(false);
     setShowAreaSuggestions(false);
     const wingsData =
       soc.wings && soc.wings.length > 0
-        ? soc.wings
+        ? soc.wings.map((w) => ({ ...w, name: toTitleCase(w.name) }))
         : [{ name: "A", floors: 10 }];
     setFormData({
-      city: soc.city,
-      area: soc.area,
-      name: soc.name,
+      city: toTitleCase(soc.city || ""),
+      area: toTitleCase(soc.area || ""),
+      name: toTitleCase(soc.name || ""),
       numberOfWings: soc.numberOfWings || wingsData.length,
       wings: wingsData,
       status: soc.status || "enabled",
@@ -239,7 +255,7 @@ export function SocietyManagementPage() {
 
   const handleWingNameChange = (index, name) => {
     const updated = [...formData.wings];
-    updated[index] = { ...updated[index], name };
+    updated[index] = { ...updated[index], name: toTitleCase(name) };
     setFormData((prev) => ({ ...prev, wings: updated }));
   };
 
@@ -303,11 +319,18 @@ export function SocietyManagementPage() {
       return;
     }
 
+    const cleanedWings = (formData.wings || []).map((w) => ({
+      ...w,
+      name: toTitleCase(String(w.name || "").trim()),
+      floors: Math.max(1, parseInt(w.floors, 10) || 1),
+    }));
+
     const payload = {
       ...formData,
       name: cleanedName,
       area: cleanedArea,
       city: cleanedCity,
+      wings: cleanedWings,
     };
 
     setIsSubmitting(true);
@@ -708,17 +731,79 @@ export function SocietyManagementPage() {
           </DialogHeader>
 
           <form onSubmit={handleSaveSociety} className="space-y-4 py-2">
-            {/* City Details */}
-            <div className="space-y-1.5 p-3 rounded-xl bg-muted/40 border border-border">
-              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                City Details
-              </Label>
-              <Input
-                placeholder="e.g. Pune"
-                value={formData.city}
-                onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                required
-              />
+            {/* City Details with Autocomplete Suggestions & Add Option */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-muted/40 border border-border relative">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  City Name *
+                </Label>
+                <span className="text-[11px] text-primary font-medium">Auto-suggest or add new city</span>
+              </div>
+              <div className="relative">
+                <Input
+                  placeholder="e.g. Pune, Mumbai, Nagpur..."
+                  value={formData.city}
+                  onFocus={() => setShowCitySuggestions(true)}
+                  onChange={(e) => {
+                    setFormData({ ...formData, city: e.target.value });
+                    setShowCitySuggestions(true);
+                  }}
+                  onBlur={() => {
+                    setTimeout(() => setShowCitySuggestions(false), 250);
+                  }}
+                  required
+                  autoComplete="off"
+                  list="city-datalist"
+                />
+                <datalist id="city-datalist">
+                  {allKnownCities.map((city) => (
+                    <option key={city} value={city} />
+                  ))}
+                </datalist>
+
+                {/* Floating Interactive City Suggestions Dropdown */}
+                {showCitySuggestions && (
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-popover text-popover-foreground border border-border rounded-xl shadow-xl overflow-hidden py-1 max-h-52 overflow-y-auto">
+                    <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-muted-foreground border-b border-border bg-muted/50 flex items-center justify-between">
+                      <span>Available Cities ({filteredCitySuggestions.length})</span>
+                      <span className="text-[9px] lowercase font-normal">Click to select</span>
+                    </div>
+
+                    {filteredCitySuggestions.map((cityName) => (
+                      <button
+                        key={cityName}
+                        type="button"
+                        className="w-full text-left px-3 py-2 text-xs hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-between group cursor-pointer border-b border-border/40 last:border-0"
+                        onMouseDown={() => {
+                          setFormData({ ...formData, city: cityName });
+                          setShowCitySuggestions(false);
+                        }}
+                      >
+                        <span className="font-semibold text-foreground group-hover:text-primary">{cityName}</span>
+                        <span className="text-[10px] text-muted-foreground group-hover:text-primary">Select</span>
+                      </button>
+                    ))}
+
+                    {/* Option to Add New City if typed text doesn't match existing */}
+                    {formData.city?.trim() &&
+                      !allKnownCities.some((c) => c.toLowerCase() === formData.city.trim().toLowerCase()) && (
+                        <button
+                          type="button"
+                          className="w-full text-left px-3 py-2.5 text-xs bg-primary/10 text-primary font-bold hover:bg-primary/20 transition-colors flex items-center gap-2 cursor-pointer border-t border-primary/20"
+                          onMouseDown={() => {
+                            const newCity = toTitleCase(formData.city.trim());
+                            setFormData({ ...formData, city: newCity });
+                            setShowCitySuggestions(false);
+                            toast.success(`New city "${newCity}" added!`);
+                          }}
+                        >
+                          <Plus className="size-3.5" />
+                          <span>Add "{toTitleCase(formData.city.trim())}" as new city</span>
+                        </button>
+                      )}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Area Details with Autocomplete Suggestions */}
@@ -886,7 +971,7 @@ export function SocietyManagementPage() {
                 <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
                   {formData.wings.map((w, idx) => (
                     <div key={idx} className="flex items-center gap-2 bg-card p-2 rounded-lg border border-border">
-                      <div className="flex items-center gap-1.5 w-28">
+                      <div className="flex items-center gap-1.5 w-28 shrink-0">
                         <span className="text-[11px] text-muted-foreground font-semibold">Wing</span>
                         <Input
                           type="text"
@@ -896,15 +981,39 @@ export function SocietyManagementPage() {
                           placeholder="Name"
                         />
                       </div>
-                      <div className="flex-1 flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min={1}
-                          max={60}
-                          value={w.floors}
-                          onChange={(e) => handleFloorChange(idx, e.target.value)}
-                          className="h-8 text-xs font-semibold"
-                        />
+                      <div className="flex-1 flex items-center gap-1.5">
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-8 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground"
+                            onClick={() => handleFloorChange(idx, Math.max(1, Number(w.floors || 1) - 1))}
+                            disabled={Number(w.floors) <= 1}
+                            title="Decrease floors (-)"
+                          >
+                            <Minus className="size-3" />
+                          </Button>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={60}
+                            value={w.floors}
+                            onChange={(e) => handleFloorChange(idx, e.target.value)}
+                            className="h-8 w-16 text-xs font-semibold text-center"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="size-8 rounded-lg cursor-pointer text-primary hover:bg-primary hover:text-white"
+                            onClick={() => handleFloorChange(idx, Math.min(60, Number(w.floors || 1) + 1))}
+                            disabled={Number(w.floors) >= 60}
+                            title="Increase floors (+)"
+                          >
+                            <Plus className="size-3" />
+                          </Button>
+                        </div>
                         <span className="text-xs text-muted-foreground shrink-0">Floors</span>
                       </div>
                       {formData.wings.length > 1 && (
@@ -1018,7 +1127,7 @@ export function SocietyManagementPage() {
               <div className="grid grid-cols-2 gap-2 pt-1">
                 {viewingSociety?.wings?.map((w, i) => (
                   <div key={i} className="p-2 rounded-lg bg-muted/50 border text-xs flex justify-between">
-                    <span className="font-bold">Wing {w.name}</span>
+                    <span className="font-bold">Wing {toTitleCase(w.name || "")}</span>
                     <span className="text-muted-foreground">{w.floors} Floors</span>
                   </div>
                 ))}

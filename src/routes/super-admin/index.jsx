@@ -56,24 +56,6 @@ function DashboardPage() {
       title="Dashboard"
       subtitle="Live operational overview across societies, registered cooks, customers, and revenues."
     >
-      {/* Welcome Banner matching Fresh App Palette */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#ea580c] via-[#f97316] to-[#fb923c] p-6 sm:p-7 text-white shadow-md shadow-orange-500/15">
-        <div className="relative z-10 max-w-2xl space-y-1.5">
-          <Badge className="bg-white/20 text-white border-white/30 text-[11px] font-semibold">
-            Mother's Kitchen Operations
-          </Badge>
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight font-sans">
-            Welcome, Super Admin
-          </h2>
-          <p className="text-orange-50 text-xs sm:text-sm leading-relaxed">
-            Manage societies, approved cooks, customers, and track daily homemade food orders right across your residential network.
-          </p>
-        </div>
-        <div className="absolute right-6 top-1/2 -translate-y-1/2 hidden md:flex items-center gap-4 opacity-15">
-          <ChefHat className="size-40 text-white" />
-        </div>
-      </div>
-
       {/* Quick Action Links — Shifted Up for High Priority Access */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <Link to="/super-admin/society" className="group">

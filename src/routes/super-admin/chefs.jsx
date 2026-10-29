@@ -199,64 +199,102 @@ export function ChefManagementPage() {
     });
   }, [societiesList, formData.city, formData.area]);
 
-  const updateFormattedAddress = (flat, wing, street, soc, area, city) => {
-    const flatStr = flat ? (flat.toLowerCase().startsWith("flat") ? flat : `Flat ${flat}`) : "";
-    const wingStr = wing ? (wing.toLowerCase().startsWith("wing") ? wing : `Wing ${wing}`) : "";
-    const flatWing = [flatStr, wingStr].filter(Boolean).join(", ");
-    return [flatWing, street, soc, area, city].filter(Boolean).join(", ");
+  // Selected base society object from store
+  const currentBaseSocietyObj = useMemo(() => {
+    return societiesList.find(
+      (s) => s.name === formData.baseSociety || s.id === formData.baseSociety
+    );
+  }, [societiesList, formData.baseSociety]);
+
+  // Available wings under selected society
+  const availableWingsForSociety = useMemo(() => {
+    if (!currentBaseSocietyObj) return [];
+    if (currentBaseSocietyObj.wings && currentBaseSocietyObj.wings.length > 0) {
+      return currentBaseSocietyObj.wings;
+    }
+    return [{ name: "A", floors: 10 }];
+  }, [currentBaseSocietyObj]);
+
+  // Available floors for selected wing
+  const availableFloorsForWing = useMemo(() => {
+    const selectedWing = availableWingsForSociety.find(
+      (w) =>
+        w.name === formData.wing ||
+        `Wing ${w.name}` === formData.wing ||
+        toTitleCase(w.name) === toTitleCase(formData.wing)
+    );
+    const count = Number(selectedWing?.floors || availableWingsForSociety[0]?.floors || 10);
+    return Array.from({ length: Math.max(1, count) }, (_, i) => i + 1);
+  }, [availableWingsForSociety, formData.wing]);
+
+  const updateFormattedAddress = (flat, floor, wing, soc, area, city) => {
+    const flatStr = flat ? `Flat ${flat}` : "";
+    const floorStr = floor ? `Floor ${floor}` : "";
+    const wingStr = wing ? (String(wing).toLowerCase().startsWith("wing") ? wing : `Wing ${wing}`) : "";
+    const internalUnit = [flatStr, floorStr, wingStr].filter(Boolean).join(", ");
+    return [internalUnit, soc, area, city].filter(Boolean).join(", ");
   };
 
   const handleFormCityChange = (newCity) => {
-    const areas = societiesList.filter((s) => s.city === newCity).map((s) => s.area);
-    const newArea = areas[0] || "";
-    const socs = societiesList.filter((s) => s.city === newCity && s.area === newArea);
-    const newSoc = socs[0]?.name || "";
-
     setFormData((prev) => ({
       ...prev,
       city: newCity,
-      area: newArea,
-      baseSociety: newSoc,
-      address: updateFormattedAddress(prev.flatNumber, prev.wing, prev.street, newSoc, newArea, newCity),
-      assignedSocieties: newSoc ? Array.from(new Set([...prev.assignedSocieties, newSoc])) : prev.assignedSocieties,
+      area: "",
+      baseSociety: "",
+      flatNumber: "",
+      floor: "",
+      wing: "",
+      address: "",
+      assignedSocieties: [],
     }));
   };
 
   const handleFormAreaChange = (newArea) => {
-    const socs = societiesList.filter(
-      (s) => (!formData.city || s.city === formData.city) && s.area === newArea
-    );
-    const newSoc = socs[0]?.name || "";
-
     setFormData((prev) => ({
       ...prev,
       area: newArea,
-      baseSociety: newSoc,
-      address: updateFormattedAddress(prev.flatNumber, prev.wing, prev.street, newSoc, newArea, prev.city),
-      assignedSocieties: newSoc ? Array.from(new Set([...prev.assignedSocieties, newSoc])) : prev.assignedSocieties,
+      baseSociety: "",
+      flatNumber: "",
+      floor: "",
+      wing: "",
+      address: "",
+      assignedSocieties: [],
     }));
   };
 
   const handleFormSocietyChange = (newSoc) => {
-    const found = societiesList.find((s) => s.name === newSoc);
+    const found = societiesList.find((s) => s.name === newSoc || s.id === newSoc);
     const city = found?.city || formData.city;
     const area = found?.area || formData.area;
+    const firstWing = found?.wings?.[0]?.name ? toTitleCase(found.wings[0].name) : "A";
 
     setFormData((prev) => ({
       ...prev,
       city,
       area,
       baseSociety: newSoc,
-      address: updateFormattedAddress(prev.flatNumber, prev.wing, prev.street, newSoc, area, city),
-      assignedSocieties: newSoc ? Array.from(new Set([...prev.assignedSocieties, newSoc])) : prev.assignedSocieties,
+      wing: firstWing,
+      floor: "1",
+      address: updateFormattedAddress(prev.flatNumber, "1", firstWing, newSoc, area, city),
+      // ONLY base society should be selected!
+      assignedSocieties: newSoc ? [newSoc] : [],
     }));
   };
 
   const handleFormFlatChange = (flatNumber) => {
+    const cleanNumber = flatNumber.replace(/\D/g, "");
     setFormData((prev) => ({
       ...prev,
-      flatNumber,
-      address: updateFormattedAddress(flatNumber, prev.wing, prev.street, prev.baseSociety, prev.area, prev.city),
+      flatNumber: cleanNumber,
+      address: updateFormattedAddress(cleanNumber, prev.floor, prev.wing, prev.baseSociety, prev.area, prev.city),
+    }));
+  };
+
+  const handleFormFloorChange = (floor) => {
+    setFormData((prev) => ({
+      ...prev,
+      floor,
+      address: updateFormattedAddress(prev.flatNumber, floor, prev.wing, prev.baseSociety, prev.area, prev.city),
     }));
   };
 
@@ -264,7 +302,7 @@ export function ChefManagementPage() {
     setFormData((prev) => ({
       ...prev,
       wing,
-      address: updateFormattedAddress(prev.flatNumber, wing, prev.street, prev.baseSociety, prev.area, prev.city),
+      address: updateFormattedAddress(prev.flatNumber, prev.floor, wing, prev.baseSociety, prev.area, prev.city),
     }));
   };
 
@@ -272,7 +310,7 @@ export function ChefManagementPage() {
     setFormData((prev) => ({
       ...prev,
       street,
-      address: updateFormattedAddress(prev.flatNumber, prev.wing, street, prev.baseSociety, prev.area, prev.city),
+      address: updateFormattedAddress(prev.flatNumber, prev.floor, prev.wing, prev.baseSociety, prev.area, prev.city),
     }));
   };
 
@@ -297,26 +335,21 @@ export function ChefManagementPage() {
 
   const handleOpenAddModal = () => {
     setEditingChef(null);
-    const firstSoc = societiesList[0];
-    const defaultCity = toTitleCase(firstSoc?.city || "Pune");
-    const defaultArea = toTitleCase(firstSoc?.area || "");
-    const defaultSocName = toTitleCase(firstSoc?.name || "");
-    const addr = [defaultSocName, defaultArea, defaultCity].filter(Boolean).join(", ");
-
     setFormData({
       fullName: "",
       email: "",
       mobileNumber: "",
       photoUrl: "",
       idCardNumber: "",
-      city: defaultCity,
-      area: defaultArea,
-      baseSociety: defaultSocName,
+      city: "",
+      area: "",
+      baseSociety: "",
       flatNumber: "",
+      floor: "",
       wing: "",
       street: "",
-      address: addr,
-      assignedSocieties: defaultSocName ? [defaultSocName] : [],
+      address: "",
+      assignedSocieties: [],
       defaultPassword: "123456",
       isDeactivatedByAdmin: false,
       isActive: true,
@@ -331,8 +364,8 @@ export function ChefManagementPage() {
     const foundSoc = societiesList.find(
       (s) => s.name === chef.baseSociety || s.id === chef.baseSociety
     );
-    const chefCity = toTitleCase(foundSoc?.city || societiesList[0]?.city || "Pune");
-    const chefArea = toTitleCase(foundSoc?.area || "");
+    const chefCity = toTitleCase(foundSoc?.city || chef.city || "");
+    const chefArea = toTitleCase(foundSoc?.area || chef.area || "");
     const chefBaseSoc = toTitleCase(chef.baseSociety || foundSoc?.name || "");
 
     setFormData({
@@ -345,10 +378,11 @@ export function ChefManagementPage() {
       area: chefArea,
       baseSociety: chefBaseSoc,
       flatNumber: chef.flatNumber || "",
+      floor: chef.floor || "",
       wing: chef.wing || "",
       street: chef.street || "",
       address: chef.address || "",
-      assignedSocieties: chef.assignedSocieties || [],
+      assignedSocieties: chef.assignedSocieties || (chefBaseSoc ? [chefBaseSoc] : []),
       defaultPassword: "••••••••",
       isDeactivatedByAdmin: Boolean(chef.isDeactivatedByAdmin),
       isActive: chef.isActive !== undefined ? Boolean(chef.isActive) : true,
@@ -418,6 +452,21 @@ export function ChefManagementPage() {
       return;
     }
 
+    if (!formData.photoUrl || !formData.photoUrl.trim()) {
+      toast.error("Chef photograph is mandatory for registration. Please upload a photo.");
+      return;
+    }
+
+    if (!formData.baseSociety) {
+      toast.error("Please select a Base Residence Society.");
+      return;
+    }
+
+    if (!formData.flatNumber) {
+      toast.error("Please enter Flat Number.");
+      return;
+    }
+
     if (!formData.assignedSocieties.length) {
       toast.error("Please assign at least one deliverable society.");
       return;
@@ -429,7 +478,10 @@ export function ChefManagementPage() {
       city: toTitleCase(formData.city),
       area: toTitleCase(formData.area),
       baseSociety: toTitleCase(formData.baseSociety),
-      street: toTitleCase(formData.street),
+      flatNumber: String(formData.flatNumber || "").trim(),
+      floor: String(formData.floor || "").trim(),
+      wing: String(formData.wing || "").trim(),
+      street: toTitleCase(formData.street || ""),
       idCardNumber: (formData.idCardNumber || "").trim(),
       aadharNumber: (formData.idCardNumber || "").trim(),
     };
@@ -1008,10 +1060,21 @@ export function ChefManagementPage() {
               </div>
             </div>
 
-            {/* Photo Upload Option with Live Preview */}
+            {/* Photo Upload Option with Live Preview (Mandatory) */}
             <div className="space-y-1.5">
-              <Label>Chef Photograph</Label>
-              <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/40 border border-border">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold">Chef Photograph *</Label>
+                <span className="text-[10px] text-destructive font-bold uppercase tracking-wider">
+                  Mandatory for Registration
+                </span>
+              </div>
+              <div
+                className={`flex items-center gap-3 p-3 rounded-xl border transition-colors ${
+                  !formData.photoUrl
+                    ? "bg-amber-500/5 border-amber-500/30"
+                    : "bg-muted/40 border-border"
+                }`}
+              >
                 <div className="relative size-14 rounded-full overflow-hidden border-2 border-primary/25 bg-card flex items-center justify-center shrink-0 shadow-2xs">
                   {formData.photoUrl ? (
                     <img
@@ -1039,7 +1102,7 @@ export function ChefManagementPage() {
                         className="h-8 text-xs gap-1.5 pointer-events-none rounded-lg"
                       >
                         <Upload className="size-3.5" />
-                        <span>{formData.photoUrl ? "Change Photo" : "Upload Photo"}</span>
+                        <span>{formData.photoUrl ? "Change Photo" : "Upload Photo *"}</span>
                       </Button>
                     </label>
                     {formData.photoUrl && (
@@ -1106,7 +1169,7 @@ export function ChefManagementPage() {
                 </div>
               </div>
 
-              {/* Base Society & Separate Flat / Wing / Street Fields */}
+              {/* Base Society & Separate Flat Number / Floor / Wing/Building Fields */}
               <div className="space-y-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Base Residence Society *</Label>
@@ -1116,7 +1179,9 @@ export function ChefManagementPage() {
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                     required
                   >
-                    <option value="">Select Base Society</option>
+                    {!formData.baseSociety && (
+                      <option value="">Select Base Society</option>
+                    )}
                     {formAvailableSocieties.map((soc) => (
                       <option key={soc.id} value={soc.name}>
                         {toTitleCase(soc.name)}
@@ -1125,36 +1190,55 @@ export function ChefManagementPage() {
                   </select>
                 </div>
 
-                {/* Separate Fields for Flat Number, Wing, Street */}
+                {/* Flat Number | Floor | Wing/Building Fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Flat Number : Text box accepting number */}
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Flat / Unit No. *</Label>
+                    <Label className="text-xs font-semibold">Flat Number *</Label>
                     <Input
-                      placeholder="e.g. 101, A-204"
+                      type="number"
+                      placeholder="e.g. 402"
                       value={formData.flatNumber || ""}
                       onChange={(e) => handleFormFlatChange(e.target.value)}
-                      className="h-10 text-xs"
+                      className="h-10 text-xs font-semibold"
                       required
                     />
                   </div>
+
+                  {/* Floor : Dropdown from data stored under society option */}
+                  <div className="space-y-1">
+                    <Label className="text-xs font-semibold">Floor *</Label>
+                    <select
+                      value={formData.floor || ""}
+                      onChange={(e) => handleFormFloorChange(e.target.value)}
+                      className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                      required
+                    >
+                      <option value="">Select Floor</option>
+                      {availableFloorsForWing.map((fl) => (
+                        <option key={fl} value={fl}>
+                          Floor {fl}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Wing/Building : Dropdown from data stored under society option */}
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Wing / Building *</Label>
-                    <Input
-                      placeholder="e.g. Wing A, Tower B"
+                    <select
                       value={formData.wing || ""}
                       onChange={(e) => handleFormWingChange(e.target.value)}
-                      className="h-10 text-xs"
+                      className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                       required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Street / Landmark</Label>
-                    <Input
-                      placeholder="e.g. Main Road, Near Park"
-                      value={formData.street || ""}
-                      onChange={(e) => handleFormStreetChange(e.target.value)}
-                      className="h-10 text-xs"
-                    />
+                    >
+                      <option value="">Select Wing</option>
+                      {availableWingsForSociety.map((w) => (
+                        <option key={w.name} value={toTitleCase(w.name)}>
+                          Wing {toTitleCase(w.name)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                 </div>
               </div>
@@ -1166,7 +1250,7 @@ export function ChefManagementPage() {
                 </Label>
                 <Input
                   id="chefAddress"
-                  placeholder="e.g. Flat 101, Wing A, Green Valley Society, Main Road, Wakad, Pune"
+                  placeholder="e.g. Flat 402, Floor 4, Wing A, Green Valley Society, Wakad, Pune"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="text-xs bg-muted/50 font-medium"
