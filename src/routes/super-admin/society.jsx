@@ -199,7 +199,8 @@ export function SocietyManagementPage() {
     return allKnownAreas.filter((a) => a.toLowerCase().includes(input));
   }, [allKnownAreas, formData.area]);
 
-  const handleOpenAddModal = () => {
+  const handleCloseModal = () => {
+    setIsAddModalOpen(false);
     setEditingSociety(null);
     setShowCitySuggestions(false);
     setShowAreaSuggestions(false);
@@ -211,6 +212,10 @@ export function SocietyManagementPage() {
       wings: [{ name: "A", floors: 10 }],
       status: "enabled",
     });
+  };
+
+  const handleOpenAddModal = () => {
+    handleCloseModal();
     setIsAddModalOpen(true);
   };
 
@@ -392,7 +397,7 @@ export function SocietyManagementPage() {
           toast.success(`New Society "${cleanedName}" registered successfully.`);
         }
       }
-      setIsAddModalOpen(false);
+      handleCloseModal();
     } catch (err) {
       console.error("Save society error:", err);
       toast.error("Failed to save society: " + (err.message || "Unknown error"));
@@ -747,7 +752,13 @@ export function SocietyManagementPage() {
       </Card>
 
       {/* Add / Edit Society Modal (BRD p. 18 Layout) */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+      <Dialog
+        open={isAddModalOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCloseModal();
+          else setIsAddModalOpen(true);
+        }}
+      >
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{editingSociety ? "Edit Society" : "Add New Location & Society"}</DialogTitle>
@@ -1091,7 +1102,7 @@ export function SocietyManagementPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={handleCloseModal}
                 disabled={isSubmitting}
               >
                 Cancel

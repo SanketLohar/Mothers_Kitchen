@@ -218,7 +218,7 @@ export function ChefManagementPage() {
 
   // Available wings under selected society
   const availableWingsForSociety = useMemo(() => {
-    if (!currentBaseSocietyObj) return [{ name: "A", floors: 10 }];
+    if (!currentBaseSocietyObj) return [];
     if (currentBaseSocietyObj.wings && currentBaseSocietyObj.wings.length > 0) {
       return currentBaseSocietyObj.wings;
     }
@@ -227,6 +227,7 @@ export function ChefManagementPage() {
 
   // Available floors for selected wing
   const availableFloorsForWing = useMemo(() => {
+    if (!formData.baseSociety || !availableWingsForSociety.length) return [];
     const selectedWing = availableWingsForSociety.find(
       (w) =>
         w.name === formData.wing ||
@@ -235,7 +236,7 @@ export function ChefManagementPage() {
     );
     const count = Number(selectedWing?.floors || availableWingsForSociety[0]?.floors || 10);
     return Array.from({ length: Math.max(1, count) }, (_, i) => i + 1);
-  }, [availableWingsForSociety, formData.wing]);
+  }, [formData.baseSociety, availableWingsForSociety, formData.wing]);
 
   const updateFormattedAddress = (flat, floor, wing, soc, area, city) => {
     const flatStr = flat ? `Flat ${flat}` : "";
@@ -246,54 +247,27 @@ export function ChefManagementPage() {
   };
 
   const handleFormCityChange = (newCity) => {
-    const areasInCity = societiesList
-      .filter((s) => (s.city || "").toLowerCase() === newCity.toLowerCase())
-      .map((s) => toTitleCase(s.area))
-      .filter(Boolean);
-    const uniqueAreas = Array.from(new Set(areasInCity));
-    const newArea = uniqueAreas[0] || "";
-
-    const socsInArea = societiesList.filter(
-      (s) =>
-        (s.city || "").toLowerCase() === newCity.toLowerCase() &&
-        (s.area || "").toLowerCase() === newArea.toLowerCase()
-    );
-    const firstSoc = socsInArea[0];
-    const newSocName = firstSoc?.name || "";
-    const firstWing = firstSoc?.wings?.[0]?.name ? toTitleCase(firstSoc.wings[0].name) : "A";
-    const firstFloor = "1";
-
     setFormData((prev) => ({
       ...prev,
       city: newCity,
-      area: newArea,
-      baseSociety: newSocName,
-      wing: firstWing,
-      floor: firstFloor,
-      address: updateFormattedAddress(prev.flatNumber, firstFloor, firstWing, newSocName, newArea, newCity),
-      assignedSocieties: newSocName ? [newSocName] : [],
+      area: "",
+      baseSociety: "",
+      floor: "",
+      wing: "",
+      address: updateFormattedAddress(prev.flatNumber, "", "", "", "", newCity),
+      assignedSocieties: [],
     }));
   };
 
   const handleFormAreaChange = (newArea) => {
-    const socsInArea = societiesList.filter(
-      (s) =>
-        (s.city || "").toLowerCase() === (formData.city || "").toLowerCase() &&
-        (s.area || "").toLowerCase() === newArea.toLowerCase()
-    );
-    const firstSoc = socsInArea[0];
-    const newSocName = firstSoc?.name || "";
-    const firstWing = firstSoc?.wings?.[0]?.name ? toTitleCase(firstSoc.wings[0].name) : "A";
-    const firstFloor = "1";
-
     setFormData((prev) => ({
       ...prev,
       area: newArea,
-      baseSociety: newSocName,
-      wing: firstWing,
-      floor: firstFloor,
-      address: updateFormattedAddress(prev.flatNumber, firstFloor, firstWing, newSocName, newArea, prev.city),
-      assignedSocieties: newSocName ? [newSocName] : [],
+      baseSociety: "",
+      floor: "",
+      wing: "",
+      address: updateFormattedAddress(prev.flatNumber, "", "", "", newArea, prev.city),
+      assignedSocieties: [],
     }));
   };
 
@@ -367,48 +341,40 @@ export function ChefManagementPage() {
       toast.success("Photo attached successfully!");
     };
     reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const initialChefFormData = {
+    fullName: "",
+    email: "",
+    mobileNumber: "",
+    photoUrl: "",
+    idCardNumber: "",
+    city: "",
+    area: "",
+    baseSociety: "",
+    flatNumber: "",
+    floor: "",
+    wing: "",
+    street: "",
+    address: "",
+    assignedSocieties: [],
+    defaultPassword: "123456",
+    isDeactivatedByAdmin: false,
+    isActive: true,
+  };
+
+  const handleCloseModal = () => {
+    setIsAddModalOpen(false);
+    setEditingChef(null);
+    setFormData({ ...initialChefFormData });
+    setAssignFilterCity("all");
+    setAssignFilterArea("all");
   };
 
   const handleOpenAddModal = () => {
     setEditingChef(null);
-
-    // Auto-select first valid city, area, society, wing, floor
-    const defaultCity = formAvailableCities[0] || "Pune";
-    const areasInCity = societiesList
-      .filter((s) => (s.city || "").toLowerCase() === defaultCity.toLowerCase())
-      .map((s) => toTitleCase(s.area))
-      .filter(Boolean);
-    const uniqueAreas = Array.from(new Set(areasInCity));
-    const defaultArea = uniqueAreas[0] || "";
-    const socsInArea = societiesList.filter(
-      (s) =>
-        (s.city || "").toLowerCase() === defaultCity.toLowerCase() &&
-        (s.area || "").toLowerCase() === defaultArea.toLowerCase()
-    );
-    const firstSoc = socsInArea[0] || societiesList[0];
-    const defaultSocName = firstSoc?.name || "";
-    const defaultWing = firstSoc?.wings?.[0]?.name ? toTitleCase(firstSoc.wings[0].name) : "A";
-    const defaultFloor = "1";
-
-    setFormData({
-      fullName: "",
-      email: "",
-      mobileNumber: "",
-      photoUrl: "",
-      idCardNumber: "",
-      city: defaultCity,
-      area: defaultArea,
-      baseSociety: defaultSocName,
-      flatNumber: "",
-      floor: defaultFloor,
-      wing: defaultWing,
-      street: "",
-      address: updateFormattedAddress("", defaultFloor, defaultWing, defaultSocName, defaultArea, defaultCity),
-      assignedSocieties: defaultSocName ? [defaultSocName] : [],
-      defaultPassword: "123456",
-      isDeactivatedByAdmin: false,
-      isActive: true,
-    });
+    setFormData({ ...initialChefFormData });
     setAssignFilterCity("all");
     setAssignFilterArea("all");
     setIsAddModalOpen(true);
@@ -583,7 +549,7 @@ export function ChefManagementPage() {
           );
         }
       }
-      setIsAddModalOpen(false);
+      handleCloseModal();
     } catch (err) {
       console.error("Save chef error:", err);
       toast.error("Failed to save chef: " + (err.message || "Unknown error"));
@@ -1023,7 +989,13 @@ export function ChefManagementPage() {
       </Card>
 
       {/* Add / Edit Chef Modal (BRD p. 20) */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
+      <Dialog
+        open={isAddModalOpen}
+        onOpenChange={(open) => {
+          if (!open) handleCloseModal();
+          else setIsAddModalOpen(true);
+        }}
+      >
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <div className="flex items-start justify-between gap-3">
@@ -1199,6 +1171,9 @@ export function ChefManagementPage() {
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                     required
                   >
+                    <option value="" disabled hidden>
+                      Select City
+                    </option>
                     {formAvailableCities.map((ct) => (
                       <option key={ct} value={ct}>
                         {toTitleCase(ct)}
@@ -1212,9 +1187,13 @@ export function ChefManagementPage() {
                   <select
                     value={formData.area || ""}
                     onChange={(e) => handleFormAreaChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     required
+                    disabled={!formData.city}
                   >
+                    <option value="" disabled hidden>
+                      {formData.city ? "Select Area" : "Select City First"}
+                    </option>
                     {formAvailableAreas.map((ar) => (
                       <option key={ar} value={ar}>
                         {toTitleCase(ar)}
@@ -1231,9 +1210,13 @@ export function ChefManagementPage() {
                   <select
                     value={formData.baseSociety || ""}
                     onChange={(e) => handleFormSocietyChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                     required
+                    disabled={!formData.area}
                   >
+                    <option value="" disabled hidden>
+                      {formData.area ? "Select Base Society" : "Select Area First"}
+                    </option>
                     {formAvailableSocieties.map((soc) => (
                       <option key={soc.id} value={soc.name}>
                         {toTitleCase(soc.name)}
@@ -1263,9 +1246,13 @@ export function ChefManagementPage() {
                     <select
                       value={formData.floor || ""}
                       onChange={(e) => handleFormFloorChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                      className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                       required
+                      disabled={!formData.baseSociety}
                     >
+                      <option value="" disabled hidden>
+                        Select Floor
+                      </option>
                       {availableFloorsForWing.map((fl) => (
                         <option key={fl} value={fl}>
                           Floor {fl}
@@ -1280,9 +1267,13 @@ export function ChefManagementPage() {
                     <select
                       value={formData.wing || ""}
                       onChange={(e) => handleFormWingChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                      className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                       required
+                      disabled={!formData.baseSociety}
                     >
+                      <option value="" disabled hidden>
+                        Select Wing
+                      </option>
                       {availableWingsForSociety.map((w) => (
                         <option key={w.name} value={toTitleCase(w.name)}>
                           Wing {toTitleCase(w.name)}
@@ -1556,7 +1547,7 @@ export function ChefManagementPage() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setIsAddModalOpen(false)}
+                onClick={handleCloseModal}
                 disabled={isSubmitting}
               >
                 Cancel
