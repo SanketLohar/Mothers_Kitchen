@@ -59,6 +59,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { isFirebaseConfigured } from "@/lib/firebase";
@@ -829,22 +836,26 @@ export function ChefManagementPage() {
                   <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     City
                   </Label>
-                  <select
+                  <Select
                     value={selectedCity}
-                    onChange={(e) => {
-                      setSelectedCity(e.target.value);
+                    onValueChange={(val) => {
+                      setSelectedCity(val);
                       setSelectedArea("all");
                       setSelectedSociety("all");
                     }}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
-                    <option key="filter-city-all" value="all">All Cities</option>
-                    {availableCities.map((ct, idx) => (
-                      <option key={`filter-city-${ct}-${idx}`} value={ct}>
-                        {ct}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="All Cities" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Cities</SelectItem>
+                      {availableCities.map((ct, idx) => (
+                        <SelectItem key={`filter-city-${ct}-${idx}`} value={ct}>
+                          {toTitleCase(ct)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Area Dropdown (Cascading from City) */}
@@ -852,21 +863,25 @@ export function ChefManagementPage() {
                   <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Area
                   </Label>
-                  <select
+                  <Select
                     value={selectedArea}
-                    onChange={(e) => {
-                      setSelectedArea(e.target.value);
+                    onValueChange={(val) => {
+                      setSelectedArea(val);
                       setSelectedSociety("all");
                     }}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
-                    <option key="filter-area-all" value="all">All Areas</option>
-                    {availableAreas.map((ar, idx) => (
-                      <option key={`filter-area-${ar}-${idx}`} value={ar}>
-                        {ar}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="All Areas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Areas</SelectItem>
+                      {availableAreas.map((ar, idx) => (
+                        <SelectItem key={`filter-area-${ar}-${idx}`} value={ar}>
+                          {toTitleCase(ar)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Society Dropdown (Cascading from Area & City) */}
@@ -874,18 +889,22 @@ export function ChefManagementPage() {
                   <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Society Name
                   </Label>
-                  <select
+                  <Select
                     value={selectedSociety}
-                    onChange={(e) => setSelectedSociety(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                    onValueChange={(val) => setSelectedSociety(val)}
                   >
-                    <option key="filter-soc-all" value="all">All Societies</option>
-                    {availableSocieties.map((soc, idx) => (
-                      <option key={`filter-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
-                        {soc.name}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="All Societies" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Societies</SelectItem>
+                      {availableSocieties.map((soc, idx) => (
+                        <SelectItem key={`filter-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
+                          {toTitleCase(soc.name)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Admin Status Dropdown */}
@@ -893,15 +912,19 @@ export function ChefManagementPage() {
                   <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Admin Status
                   </Label>
-                  <select
+                  <Select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                    onValueChange={(val) => setStatusFilter(val)}
                   >
-                    <option key="filter-status-all" value="all">All Statuses</option>
-                    <option key="filter-status-enabled" value="enabled">Admin Enabled</option>
-                    <option key="filter-status-disabled" value="disabled">Admin Blocked</option>
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="enabled">Admin Enabled</SelectItem>
+                      <SelectItem value="disabled">Admin Blocked</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Matched Count & Apply Button */}
@@ -1253,41 +1276,41 @@ export function ChefManagementPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">City *</Label>
-                  <select
-                    value={formData.city || ""}
-                    onChange={(e) => handleFormCityChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
-                    required
+                  <Select
+                    value={formData.city || undefined}
+                    onValueChange={(val) => handleFormCityChange(val)}
                   >
-                    <option key="opt-city-placeholder" value="" disabled hidden>
-                      Select City
-                    </option>
-                    {formAvailableCities.map((ct, idx) => (
-                      <option key={`opt-city-${ct}-${idx}`} value={ct}>
-                        {toTitleCase(ct)}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="Select City" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formAvailableCities.map((ct, idx) => (
+                        <SelectItem key={`opt-city-${ct}-${idx}`} value={ct}>
+                          {toTitleCase(ct)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Area *</Label>
-                  <select
-                    value={formData.area || ""}
-                    onChange={(e) => handleFormAreaChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    required
+                  <Select
+                    value={formData.area || undefined}
+                    onValueChange={(val) => handleFormAreaChange(val)}
                     disabled={!formData.city}
                   >
-                    <option key="opt-area-placeholder" value="" disabled hidden>
-                      {formData.city ? "Select Area" : "Select City First"}
-                    </option>
-                    {formAvailableAreas.map((ar, idx) => (
-                      <option key={`opt-area-${ar}-${idx}`} value={ar}>
-                        {toTitleCase(ar)}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">
+                      <SelectValue placeholder={formData.city ? "Select Area" : "Select City First"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formAvailableAreas.map((ar, idx) => (
+                        <SelectItem key={`opt-area-${ar}-${idx}`} value={ar}>
+                          {toTitleCase(ar)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1295,22 +1318,22 @@ export function ChefManagementPage() {
               <div className="space-y-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Base Residence Society *</Label>
-                  <select
-                    value={formData.baseSociety || ""}
-                    onChange={(e) => handleFormSocietyChange(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                    required
+                  <Select
+                    value={formData.baseSociety || undefined}
+                    onValueChange={(val) => handleFormSocietyChange(val)}
                     disabled={!formData.area}
                   >
-                    <option key="opt-soc-placeholder" value="" disabled hidden>
-                      {formData.area ? "Select Base Society" : "Select Area First"}
-                    </option>
-                    {formAvailableSocieties.map((soc, idx) => (
-                      <option key={`opt-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
-                        {toTitleCase(soc.name)}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">
+                      <SelectValue placeholder={formData.area ? "Select Base Society" : "Select Area First"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {formAvailableSocieties.map((soc, idx) => (
+                        <SelectItem key={`opt-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
+                          {toTitleCase(soc.name)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Flat Number | Floor | Wing/Building Fields */}
@@ -1331,43 +1354,43 @@ export function ChefManagementPage() {
                   {/* Floor : Dropdown from data stored under society option */}
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Floor *</Label>
-                    <select
-                      value={formData.floor || ""}
-                      onChange={(e) => handleFormFloorChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                      required
+                    <Select
+                      value={formData.floor ? String(formData.floor) : undefined}
+                      onValueChange={(val) => handleFormFloorChange(val)}
                       disabled={!formData.baseSociety}
                     >
-                      <option key="opt-floor-placeholder" value="" disabled hidden>
-                        Select Floor
-                      </option>
-                      {availableFloorsForWing.map((fl, idx) => (
-                        <option key={`opt-floor-${fl}-${idx}`} value={fl}>
-                          Floor {fl}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">
+                        <SelectValue placeholder="Select Floor" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableFloorsForWing.map((fl, idx) => (
+                          <SelectItem key={`opt-floor-${fl}-${idx}`} value={String(fl)}>
+                            Floor {fl}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Wing/Building : Dropdown from data stored under society option */}
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Wing / Building *</Label>
-                    <select
-                      value={formData.wing || ""}
-                      onChange={(e) => handleFormWingChange(e.target.value)}
-                      className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                      required
+                    <Select
+                      value={formData.wing || undefined}
+                      onValueChange={(val) => handleFormWingChange(val)}
                       disabled={!formData.baseSociety}
                     >
-                      <option key="opt-wing-placeholder" value="" disabled hidden>
-                        Select Wing
-                      </option>
-                      {availableWingsForSociety.map((w, idx) => (
-                        <option key={`opt-wing-${w.name || idx}-${idx}`} value={toTitleCase(w.name)}>
-                          Wing {toTitleCase(w.name)}
-                        </option>
-                      ))}
-                    </select>
+                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">
+                        <SelectValue placeholder="Select Wing" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableWingsForSociety.map((w, idx) => (
+                          <SelectItem key={`opt-wing-${w.name || idx}-${idx}`} value={toTitleCase(w.name)}>
+                            Wing {toTitleCase(w.name)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -1406,32 +1429,40 @@ export function ChefManagementPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 pb-1">
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold text-muted-foreground">Select City</Label>
-                  <select
+                  <Select
                     value={assignFilterCity}
-                    onChange={(e) => {
-                      setAssignFilterCity(e.target.value);
+                    onValueChange={(val) => {
+                      setAssignFilterCity(val);
                       setAssignFilterArea("all");
                     }}
-                    className="w-full h-8 px-2.5 rounded-lg border border-input bg-card text-foreground text-xs font-medium cursor-pointer"
                   >
-                    <option key="alloc-city-all" value="all">All Cities</option>
-                    {assignAvailableCities.map((c, idx) => (
-                      <option key={`alloc-city-${c}-${idx}`} value={c}>{toTitleCase(c)}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-9 px-2.5 rounded-xl border border-input bg-card text-foreground text-xs font-medium cursor-pointer">
+                      <SelectValue placeholder="All Cities" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Cities</SelectItem>
+                      {assignAvailableCities.map((c, idx) => (
+                        <SelectItem key={`alloc-city-${c}-${idx}`} value={c}>{toTitleCase(c)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-[11px] font-semibold text-muted-foreground">Select Area</Label>
-                  <select
+                  <Select
                     value={assignFilterArea}
-                    onChange={(e) => setAssignFilterArea(e.target.value)}
-                    className="w-full h-8 px-2.5 rounded-lg border border-input bg-card text-foreground text-xs font-medium cursor-pointer"
+                    onValueChange={(val) => setAssignFilterArea(val)}
                   >
-                    <option key="alloc-area-all" value="all">All Areas</option>
-                    {assignAvailableAreas.map((a, idx) => (
-                      <option key={`alloc-area-${a}-${idx}`} value={a}>{toTitleCase(a)}</option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-9 px-2.5 rounded-xl border border-input bg-card text-foreground text-xs font-medium cursor-pointer">
+                      <SelectValue placeholder="All Areas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Areas</SelectItem>
+                      {assignAvailableAreas.map((a, idx) => (
+                        <SelectItem key={`alloc-area-${a}-${idx}`} value={a}>{toTitleCase(a)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 

@@ -56,6 +56,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { isFirebaseConfigured } from "@/lib/firebase";
@@ -560,21 +567,25 @@ export function SocietyManagementPage() {
                   <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     City
                   </Label>
-                  <select
+                  <Select
                     value={selectedCity}
-                    onChange={(e) => {
-                      setSelectedCity(e.target.value);
+                    onValueChange={(val) => {
+                      setSelectedCity(val);
                       setSelectedArea("all");
                     }}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
-                    <option value="all">All Cities</option>
-                    {availableCities.map((ct) => (
-                      <option key={ct} value={ct}>
-                        {ct}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="All Cities" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Cities</SelectItem>
+                      {availableCities.map((ct) => (
+                        <SelectItem key={ct} value={ct}>
+                          {ct}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Area Dropdown (Cascading from City) */}
@@ -582,18 +593,22 @@ export function SocietyManagementPage() {
                   <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Area
                   </Label>
-                  <select
+                  <Select
                     value={selectedArea}
-                    onChange={(e) => setSelectedArea(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                    onValueChange={(val) => setSelectedArea(val)}
                   >
-                    <option value="all">All Areas</option>
-                    {availableAreas.map((ar) => (
-                      <option key={ar} value={ar}>
-                        {ar}
-                      </option>
-                    ))}
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="All Areas" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Areas</SelectItem>
+                      {availableAreas.map((ar) => (
+                        <SelectItem key={ar} value={ar}>
+                          {ar}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Status Dropdown */}
@@ -601,15 +616,19 @@ export function SocietyManagementPage() {
                   <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
                     Status
                   </Label>
-                  <select
+                  <Select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                    onValueChange={(val) => setStatusFilter(val)}
                   >
-                    <option value="all">All Statuses</option>
-                    <option value="enabled">Enabled</option>
-                    <option value="disabled">Disabled</option>
-                  </select>
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="All Statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Statuses</SelectItem>
+                      <SelectItem value="enabled">Enabled</SelectItem>
+                      <SelectItem value="disabled">Disabled</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 {/* Popover Footer */}
