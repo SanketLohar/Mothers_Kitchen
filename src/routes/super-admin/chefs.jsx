@@ -77,7 +77,42 @@ export const Route = createFileRoute("/super-admin/chefs")({
   component: ChefManagementPage,
 });
 
-const DEFAULT_CHEF_AVATAR = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80";
+function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs" }) {
+  const [hasError, setHasError] = useState(false);
+  const initials = (name || "C")
+    .split(/\s+/)
+    .map((w) => w[0])
+    .filter(Boolean)
+    .slice(0, 2)
+    .join("")
+    .toUpperCase();
+
+  const isValidUrl = Boolean(
+    photoUrl &&
+    typeof photoUrl === "string" &&
+    photoUrl.trim() &&
+    !hasError
+  );
+
+  if (isValidUrl) {
+    return (
+      <img
+        src={photoUrl.trim()}
+        alt={name || "Chef"}
+        className={`${size} rounded-full object-cover border border-border bg-muted`}
+        onError={() => setHasError(true)}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${size} rounded-full border border-primary/25 bg-primary/10 text-primary font-bold ${textSize} flex items-center justify-center shrink-0 uppercase tracking-wider select-none shadow-2xs`}
+    >
+      {initials || <ChefHat className="size-4" />}
+    </div>
+  );
+}
 
 export function ChefManagementPage() {
   const [chefs, setChefs] = useState([]);
@@ -927,13 +962,10 @@ export function ChefManagementPage() {
                   <TableCell>
                     <div className="flex items-center gap-3">
                       <div className="relative shrink-0">
-                        <img
-                          src={chef.photoUrl?.trim() ? chef.photoUrl : DEFAULT_CHEF_AVATAR}
-                          alt={chef.fullName || "Chef"}
-                          className="size-11 rounded-full object-cover border border-border bg-muted"
-                          onError={(e) => {
-                            e.target.src = DEFAULT_CHEF_AVATAR;
-                          }}
+                        <ChefAvatar
+                          photoUrl={chef.photoUrl}
+                          name={chef.fullName}
+                          size="size-11"
                         />
                         {/* Live Avatar Presence Badge */}
                         <span
@@ -1649,13 +1681,11 @@ export function ChefManagementPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
-              <img
-                src={viewingChef?.photoUrl?.trim() ? viewingChef.photoUrl : DEFAULT_CHEF_AVATAR}
-                alt={viewingChef?.fullName || "Chef"}
-                className="size-12 rounded-full object-cover border"
-                onError={(e) => {
-                  e.target.src = DEFAULT_CHEF_AVATAR;
-                }}
+              <ChefAvatar
+                photoUrl={viewingChef?.photoUrl}
+                name={viewingChef?.fullName}
+                size="size-12"
+                textSize="text-sm"
               />
               <div>
                 <div className="font-bold">{toTitleCase(viewingChef?.fullName)}</div>
