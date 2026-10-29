@@ -1031,8 +1031,10 @@ export function ChefManagementPage() {
                   id="chefName"
                   placeholder="e.g. Sunita Patil"
                   value={formData.fullName}
-                  onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, fullName: toTitleCase(e.target.value) })}
+                  onBlur={() => setFormData((prev) => ({ ...prev, fullName: toTitleCase(prev.fullName.trim()) }))}
                   required
+                  autoComplete="off"
                 />
                 {editingChef && (
                   <div className="flex items-center gap-2 pt-0.5">
