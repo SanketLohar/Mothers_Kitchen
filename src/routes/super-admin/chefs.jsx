@@ -22,6 +22,8 @@ import {
   Building2,
   FileSpreadsheet,
   Filter,
+  ZoomIn,
+  ExternalLink,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,7 +86,7 @@ export const Route = createFileRoute("/super-admin/chefs")({
   component: ChefManagementPage,
 });
 
-function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs" }) {
+function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs", onClick, className = "" }) {
   const [hasError, setHasError] = useState(false);
   const initials = (name || "C")
     .split(/\s+/)
@@ -106,7 +108,8 @@ function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs" }) 
       <img
         src={photoUrl.trim()}
         alt={name || "Chef"}
-        className={`${size} rounded-full object-cover border border-border bg-muted`}
+        onClick={onClick}
+        className={`${size} rounded-full object-cover border border-border bg-muted ${onClick ? "cursor-pointer" : ""} ${className}`}
         onError={() => setHasError(true)}
       />
     );
@@ -114,7 +117,8 @@ function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs" }) 
 
   return (
     <div
-      className={`${size} rounded-full border border-primary/25 bg-primary/10 text-primary font-bold ${textSize} flex items-center justify-center shrink-0 uppercase tracking-wider select-none shadow-2xs`}
+      onClick={onClick}
+      className={`${size} rounded-full border border-primary/25 bg-primary/10 text-primary font-bold ${textSize} flex items-center justify-center shrink-0 uppercase tracking-wider select-none shadow-2xs ${onClick ? "cursor-pointer" : ""} ${className}`}
     >
       {initials || <ChefHat className="size-4" />}
     </div>
@@ -180,6 +184,7 @@ export function ChefManagementPage() {
   const [editingChef, setEditingChef] = useState(null);
   const [deleteChefId, setDeleteChefId] = useState(null);
   const [viewingChef, setViewingChef] = useState(null);
+  const [previewImage, setPreviewImage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form State for Add / Edit Chef (BRD p. 20)
@@ -990,7 +995,20 @@ export function ChefManagementPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-3 group/chef">
-                      <div className="relative shrink-0 transition-transform group-hover/chef:scale-105">
+                      <div
+                        className="relative shrink-0 transition-transform group-hover/chef:scale-105 cursor-pointer"
+                        onClick={(e) => {
+                          if (chef.photoUrl) {
+                            e.stopPropagation();
+                            setPreviewImage({
+                              url: chef.photoUrl,
+                              title: toTitleCase(chef.fullName),
+                              subtitle: `Chef ID: ${chef.id} • ${toTitleCase(chef.baseSociety || "")}`
+                            });
+                          }
+                        }}
+                        title={chef.photoUrl ? "Click to view photo" : "Click to view profile"}
+                      >
                         <ChefAvatar
                           photoUrl={chef.photoUrl}
                           name={chef.fullName}
@@ -1720,13 +1738,33 @@ export function ChefManagementPage() {
       <Dialog open={Boolean(viewingChef)} onOpenChange={(open) => !open && setViewingChef(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <ChefAvatar
-                photoUrl={viewingChef?.photoUrl}
-                name={viewingChef?.fullName}
-                size="size-12"
-                textSize="text-sm"
-              />
+            <DialogTitle className="flex items-center gap-3.5">
+              <div
+                className="relative group cursor-pointer shrink-0"
+                onClick={() => {
+                  if (viewingChef?.photoUrl) {
+                    setPreviewImage({
+                      url: viewingChef.photoUrl,
+                      title: toTitleCase(viewingChef.fullName),
+                      subtitle: `Chef ID: ${viewingChef.id} • Aadhar / ID: ${viewingChef.aadharNumber || viewingChef.idCardNumber || "—"}`,
+                    });
+                  }
+                }}
+                title={viewingChef?.photoUrl ? "Click to view full photo" : "No photo uploaded"}
+              >
+                <ChefAvatar
+                  photoUrl={viewingChef?.photoUrl}
+                  name={viewingChef?.fullName}
+                  size="size-14"
+                  textSize="text-base"
+                  className="ring-2 ring-primary/25 group-hover:ring-primary group-hover:scale-105 transition-all shadow-md"
+                />
+                {viewingChef?.photoUrl && (
+                  <span className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                    <ZoomIn className="size-4 drop-shadow" />
+                  </span>
+                )}
+              </div>
               <div>
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-base">{toTitleCase(viewingChef?.fullName)}</span>
@@ -1737,6 +1775,22 @@ export function ChefManagementPage() {
                 <div className="text-xs text-muted-foreground font-normal">
                   Aadhar / ID: {viewingChef?.aadharNumber || viewingChef?.idCardNumber || "—"}
                 </div>
+                {viewingChef?.photoUrl && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewImage({
+                        url: viewingChef.photoUrl,
+                        title: toTitleCase(viewingChef.fullName),
+                        subtitle: `Chef ID: ${viewingChef.id} • Aadhar / ID: ${viewingChef.aadharNumber || viewingChef.idCardNumber || "—"}`,
+                      });
+                    }}
+                    className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 mt-1 cursor-pointer"
+                  >
+                    <ZoomIn className="size-3" />
+                    <span>View full photo</span>
+                  </button>
+                )}
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -1862,6 +1916,48 @@ export function ChefManagementPage() {
               variant="default"
               onClick={() => setViewingChef(null)}
               className="rounded-xl text-xs font-semibold px-5 cursor-pointer"
+            >
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Full Size Photo Preview Lightbox Dialog */}
+      <Dialog open={Boolean(previewImage)} onOpenChange={(open) => !open && setPreviewImage(null)}>
+        <DialogContent className="max-w-md p-0 overflow-hidden bg-card border border-border shadow-2xl rounded-2xl z-[130]">
+          <DialogHeader className="p-4 pb-2 border-b border-border">
+            <DialogTitle className="flex items-center justify-between text-base">
+              <span>{previewImage?.title || "Chef Photograph"}</span>
+            </DialogTitle>
+            {previewImage?.subtitle && (
+              <DialogDescription className="text-xs text-muted-foreground">
+                {previewImage.subtitle}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+          <div className="bg-zinc-950 flex items-center justify-center p-3 min-h-[280px] max-h-[65vh]">
+            <img
+              src={previewImage?.url}
+              alt={previewImage?.title || "Chef Photo"}
+              className="max-h-[60vh] w-auto max-w-full object-contain rounded-xl shadow-lg"
+            />
+          </div>
+          <DialogFooter className="p-3 border-t border-border flex sm:justify-between items-center gap-2">
+            <a
+              href={previewImage?.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              download={`${(previewImage?.title || "chef").toLowerCase().replace(/\s+/g, "_")}_photo.jpg`}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-input bg-background hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer"
+            >
+              <ExternalLink className="size-3.5" />
+              <span>Full View</span>
+            </a>
+            <Button
+              size="sm"
+              onClick={() => setPreviewImage(null)}
+              className="rounded-xl px-5 text-xs font-semibold cursor-pointer"
             >
               Close
             </Button>
