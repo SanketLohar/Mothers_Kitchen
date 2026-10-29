@@ -936,14 +936,6 @@ export function SocietyManagementPage() {
                 required
                 autoComplete="off"
               />
-              {formData.name.trim() && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground pt-0.5">
-                  <span>Firestore Document ID:</span>
-                  <Badge variant="outline" className="font-mono text-[10px] text-primary">
-                    {generateSocietyId(formData.name)}
-                  </Badge>
-                </div>
-              )}
 
               <div className="grid grid-cols-2 gap-3 pt-1">
                 <div>
