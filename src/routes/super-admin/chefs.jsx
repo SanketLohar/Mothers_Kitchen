@@ -275,17 +275,15 @@ export function ChefManagementPage() {
     const found = societiesList.find((s) => s.name === newSoc || s.id === newSoc);
     const city = found?.city || formData.city;
     const area = found?.area || formData.area;
-    const firstWing = found?.wings?.[0]?.name ? toTitleCase(found.wings[0].name) : "A";
-    const firstFloor = "1";
 
     setFormData((prev) => ({
       ...prev,
       city,
       area,
       baseSociety: newSoc,
-      wing: firstWing,
-      floor: firstFloor,
-      address: updateFormattedAddress(prev.flatNumber, firstFloor, firstWing, newSoc, area, city),
+      wing: "",
+      floor: "",
+      address: updateFormattedAddress(prev.flatNumber, "", "", newSoc, area, city),
       // ONLY base society should be selected!
       assignedSocieties: newSoc ? [newSoc] : [],
     }));
@@ -487,6 +485,16 @@ export function ChefManagementPage() {
 
     if (!formData.flatNumber) {
       toast.error("Please enter Flat Number.");
+      return;
+    }
+
+    if (!formData.floor) {
+      toast.error("Please select a Floor.");
+      return;
+    }
+
+    if (!formData.wing) {
+      toast.error("Please select a Wing / Building.");
       return;
     }
 
