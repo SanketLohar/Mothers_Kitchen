@@ -191,22 +191,22 @@ export async function syncChefToSocieties(chefId, chefData, assignedSocieties, b
             },
             { merge: true }
           );
+
+          // Re-count chefs in this assigned society's subcollection to update totalChefs accurately
+          try {
+            const subSnap = await getDocs(collection(db, "societies", socId, "chefs"));
+            await updateDoc(doc(db, "societies", socId), {
+              totalChefs: subSnap.size,
+              updatedAt: serverTimestamp(),
+            });
+          } catch (countErr) {
+            console.warn("Could not recount chefs for society:", socId, countErr);
+          }
         } else {
           // Remove if previously assigned
           try {
             await deleteDoc(subColDocRef);
           } catch {}
-        }
-
-        // Re-count chefs in this society's subcollection to update totalChefs accurately
-        try {
-          const subSnap = await getDocs(collection(db, "societies", socId, "chefs"));
-          await updateDoc(doc(db, "societies", socId), {
-            totalChefs: subSnap.size,
-            updatedAt: serverTimestamp(),
-          });
-        } catch (countErr) {
-          console.warn("Could not recount chefs for society:", socId, countErr);
         }
       })
     );
@@ -273,8 +273,10 @@ export async function createChef(data) {
 
   await setDoc(chefRef, chefDocData);
 
-  // Sync into subcollections under matching societies
-  await syncChefToSocieties(chefId, chefDocData, assignedSocieties, baseSociety);
+  // Sync into subcollections under matching societies in background (non-blocking for fast UI response)
+  syncChefToSocieties(chefId, chefDocData, assignedSocieties, baseSociety).catch((syncErr) =>
+    console.warn("Background syncChefToSocieties warning:", syncErr)
+  );
 
   return { id: chefId, ...chefDocData };
 }
@@ -329,8 +331,10 @@ export async function updateChef(chefId, data) {
 
   await updateDoc(docRef, updatePayload);
 
-  // Sync into subcollections under matching societies
-  await syncChefToSocieties(chefId, updatePayload, assignedSocieties, baseSociety);
+  // Sync into subcollections under matching societies in background
+  syncChefToSocieties(chefId, updatePayload, assignedSocieties, baseSociety).catch((syncErr) =>
+    console.warn("Background syncChefToSocieties update warning:", syncErr)
+  );
 }
 
 /**

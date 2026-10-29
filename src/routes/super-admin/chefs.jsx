@@ -77,6 +77,8 @@ export const Route = createFileRoute("/super-admin/chefs")({
   component: ChefManagementPage,
 });
 
+const DEFAULT_CHEF_AVATAR = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80";
+
 export function ChefManagementPage() {
   const [chefs, setChefs] = useState([]);
   const [societiesList, setSocietiesList] = useState([]);
@@ -322,24 +324,68 @@ export function ChefManagementPage() {
     }));
   };
 
-  const handlePhotoSelect = (e) => {
+  const compressImage = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const maxDim = 480;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxDim) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            }
+          } else {
+            if (height > maxDim) {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // 0.8 JPEG quality gives crisp avatar quality with typical size ~25-45 KB
+          const compressed = canvas.toDataURL("image/jpeg", 0.8);
+          resolve(compressed);
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       toast.error("Please upload an image file (PNG, JPG, WebP).");
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image file size exceeds the 5 MB limit.");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image file size exceeds the 10 MB limit.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setFormData((prev) => ({ ...prev, photoUrl: event.target.result }));
-      toast.success("Photo attached successfully!");
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+
+    try {
+      const compressedDataUrl = await compressImage(file);
+      setFormData((prev) => ({ ...prev, photoUrl: compressedDataUrl }));
+      toast.success("Photo attached and optimized!");
+    } catch (err) {
+      console.error("Error processing photo:", err);
+      toast.error("Failed to process photo. Please try a different image.");
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const initialChefFormData = {
@@ -757,9 +803,9 @@ export function ChefManagementPage() {
                     }}
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
-                    <option value="all">All Cities</option>
-                    {availableCities.map((ct) => (
-                      <option key={ct} value={ct}>
+                    <option key="filter-city-all" value="all">All Cities</option>
+                    {availableCities.map((ct, idx) => (
+                      <option key={`filter-city-${ct}-${idx}`} value={ct}>
                         {ct}
                       </option>
                     ))}
@@ -779,9 +825,9 @@ export function ChefManagementPage() {
                     }}
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
-                    <option value="all">All Areas</option>
-                    {availableAreas.map((ar) => (
-                      <option key={ar} value={ar}>
+                    <option key="filter-area-all" value="all">All Areas</option>
+                    {availableAreas.map((ar, idx) => (
+                      <option key={`filter-area-${ar}-${idx}`} value={ar}>
                         {ar}
                       </option>
                     ))}
@@ -798,9 +844,9 @@ export function ChefManagementPage() {
                     onChange={(e) => setSelectedSociety(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
-                    <option value="all">All Societies</option>
-                    {availableSocieties.map((soc) => (
-                      <option key={soc.id} value={soc.name}>
+                    <option key="filter-soc-all" value="all">All Societies</option>
+                    {availableSocieties.map((soc, idx) => (
+                      <option key={`filter-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
                         {soc.name}
                       </option>
                     ))}
@@ -817,9 +863,9 @@ export function ChefManagementPage() {
                     onChange={(e) => setStatusFilter(e.target.value)}
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                   >
-                    <option value="all">All Statuses</option>
-                    <option value="enabled">Admin Enabled</option>
-                    <option value="disabled">Admin Blocked</option>
+                    <option key="filter-status-all" value="all">All Statuses</option>
+                    <option key="filter-status-enabled" value="enabled">Admin Enabled</option>
+                    <option key="filter-status-disabled" value="disabled">Admin Blocked</option>
                   </select>
                 </div>
 
@@ -882,11 +928,11 @@ export function ChefManagementPage() {
                     <div className="flex items-center gap-3">
                       <div className="relative shrink-0">
                         <img
-                          src={chef.photoUrl}
-                          alt={chef.fullName}
+                          src={chef.photoUrl?.trim() ? chef.photoUrl : DEFAULT_CHEF_AVATAR}
+                          alt={chef.fullName || "Chef"}
                           className="size-11 rounded-full object-cover border border-border bg-muted"
                           onError={(e) => {
-                            e.target.src = "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80";
+                            e.target.src = DEFAULT_CHEF_AVATAR;
                           }}
                         />
                         {/* Live Avatar Presence Badge */}
@@ -1115,7 +1161,7 @@ export function ChefManagementPage() {
                 }`}
               >
                 <div className="relative size-14 rounded-full overflow-hidden border-2 border-primary/25 bg-card flex items-center justify-center shrink-0 shadow-2xs">
-                  {formData.photoUrl ? (
+                  {formData.photoUrl && formData.photoUrl.trim() ? (
                     <img
                       src={formData.photoUrl}
                       alt="Chef Preview"
@@ -1181,11 +1227,11 @@ export function ChefManagementPage() {
                     className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
                     required
                   >
-                    <option value="" disabled hidden>
+                    <option key="opt-city-placeholder" value="" disabled hidden>
                       Select City
                     </option>
-                    {formAvailableCities.map((ct) => (
-                      <option key={ct} value={ct}>
+                    {formAvailableCities.map((ct, idx) => (
+                      <option key={`opt-city-${ct}-${idx}`} value={ct}>
                         {toTitleCase(ct)}
                       </option>
                     ))}
@@ -1201,11 +1247,11 @@ export function ChefManagementPage() {
                     required
                     disabled={!formData.city}
                   >
-                    <option value="" disabled hidden>
+                    <option key="opt-area-placeholder" value="" disabled hidden>
                       {formData.city ? "Select Area" : "Select City First"}
                     </option>
-                    {formAvailableAreas.map((ar) => (
-                      <option key={ar} value={ar}>
+                    {formAvailableAreas.map((ar, idx) => (
+                      <option key={`opt-area-${ar}-${idx}`} value={ar}>
                         {toTitleCase(ar)}
                       </option>
                     ))}
@@ -1224,11 +1270,11 @@ export function ChefManagementPage() {
                     required
                     disabled={!formData.area}
                   >
-                    <option value="" disabled hidden>
+                    <option key="opt-soc-placeholder" value="" disabled hidden>
                       {formData.area ? "Select Base Society" : "Select Area First"}
                     </option>
-                    {formAvailableSocieties.map((soc) => (
-                      <option key={soc.id} value={soc.name}>
+                    {formAvailableSocieties.map((soc, idx) => (
+                      <option key={`opt-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
                         {toTitleCase(soc.name)}
                       </option>
                     ))}
@@ -1260,11 +1306,11 @@ export function ChefManagementPage() {
                       required
                       disabled={!formData.baseSociety}
                     >
-                      <option value="" disabled hidden>
+                      <option key="opt-floor-placeholder" value="" disabled hidden>
                         Select Floor
                       </option>
-                      {availableFloorsForWing.map((fl) => (
-                        <option key={fl} value={fl}>
+                      {availableFloorsForWing.map((fl, idx) => (
+                        <option key={`opt-floor-${fl}-${idx}`} value={fl}>
                           Floor {fl}
                         </option>
                       ))}
@@ -1281,11 +1327,11 @@ export function ChefManagementPage() {
                       required
                       disabled={!formData.baseSociety}
                     >
-                      <option value="" disabled hidden>
+                      <option key="opt-wing-placeholder" value="" disabled hidden>
                         Select Wing
                       </option>
-                      {availableWingsForSociety.map((w) => (
-                        <option key={w.name} value={toTitleCase(w.name)}>
+                      {availableWingsForSociety.map((w, idx) => (
+                        <option key={`opt-wing-${w.name || idx}-${idx}`} value={toTitleCase(w.name)}>
                           Wing {toTitleCase(w.name)}
                         </option>
                       ))}
@@ -1336,9 +1382,9 @@ export function ChefManagementPage() {
                     }}
                     className="w-full h-8 px-2.5 rounded-lg border border-input bg-card text-foreground text-xs font-medium cursor-pointer"
                   >
-                    <option value="all">All Cities</option>
-                    {assignAvailableCities.map((c) => (
-                      <option key={c} value={c}>{toTitleCase(c)}</option>
+                    <option key="alloc-city-all" value="all">All Cities</option>
+                    {assignAvailableCities.map((c, idx) => (
+                      <option key={`alloc-city-${c}-${idx}`} value={c}>{toTitleCase(c)}</option>
                     ))}
                   </select>
                 </div>
@@ -1349,9 +1395,9 @@ export function ChefManagementPage() {
                     onChange={(e) => setAssignFilterArea(e.target.value)}
                     className="w-full h-8 px-2.5 rounded-lg border border-input bg-card text-foreground text-xs font-medium cursor-pointer"
                   >
-                    <option value="all">All Areas</option>
-                    {assignAvailableAreas.map((a) => (
-                      <option key={a} value={a}>{toTitleCase(a)}</option>
+                    <option key="alloc-area-all" value="all">All Areas</option>
+                    {assignAvailableAreas.map((a, idx) => (
+                      <option key={`alloc-area-${a}-${idx}`} value={a}>{toTitleCase(a)}</option>
                     ))}
                   </select>
                 </div>
@@ -1604,9 +1650,12 @@ export function ChefManagementPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3">
               <img
-                src={viewingChef?.photoUrl}
-                alt={viewingChef?.fullName}
+                src={viewingChef?.photoUrl?.trim() ? viewingChef.photoUrl : DEFAULT_CHEF_AVATAR}
+                alt={viewingChef?.fullName || "Chef"}
                 className="size-12 rounded-full object-cover border"
+                onError={(e) => {
+                  e.target.src = DEFAULT_CHEF_AVATAR;
+                }}
               />
               <div>
                 <div className="font-bold">{toTitleCase(viewingChef?.fullName)}</div>
