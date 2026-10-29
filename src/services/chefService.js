@@ -90,13 +90,15 @@ export function subscribeToChefs(callback, onError) {
       const list = snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         const cleanMobile = (data.mobileNumber || "").replace(/\D/g, "");
+        const isDeactivated = Boolean(data.isDeactivatedByAdmin);
         return {
           id: docSnap.id,
           ...data,
           fullName: data.fullName || data.name || "Chef",
-          // Two authoritative fields — all else ignored
-          isActive: data.isActive !== false, // mobile app controls this
-          isDeactivatedByAdmin: Boolean(data.isDeactivatedByAdmin), // admin controls this
+          isDeactivatedByAdmin: isDeactivated,
+          // When deactivated by admin, isActive is strictly false
+          isActive: isDeactivated ? false : (data.isActive !== false && data.status !== "disabled"),
+          status: isDeactivated ? "disabled" : (data.status || "enabled"),
           loginMobile: data.loginMobile || cleanMobile,
           authEmail: data.authEmail || (cleanMobile ? `${cleanMobile}@motherskitchen.com` : ""),
           password: data.password || data.defaultPassword || "",
@@ -172,6 +174,9 @@ export async function syncChefToSocieties(chefId, chefData, assignedSocieties, b
         const subColDocRef = doc(db, "societies", socId, "chefs", chefId);
 
         if (isAssigned) {
+          const isDeactivated = Boolean(chefData.isDeactivatedByAdmin);
+          const isActive = isDeactivated ? false : chefData.isActive !== false;
+
           // Add or update chef in this society's chefs subcollection
           await setDoc(
             subColDocRef,
@@ -185,8 +190,9 @@ export async function syncChefToSocieties(chefId, chefData, assignedSocieties, b
               authEmail: chefData.authEmail || (cleanMobile ? `${cleanMobile}@motherskitchen.com` : ""),
               photoUrl: chefData.photoUrl || "",
               baseSociety: chefData.baseSociety || "",
-              isActive: chefData.isActive !== false,
-              isDeactivatedByAdmin: Boolean(chefData.isDeactivatedByAdmin),
+              isActive,
+              isDeactivatedByAdmin: isDeactivated,
+              status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
               assignedAt: serverTimestamp(),
             },
             { merge: true }
@@ -316,10 +322,25 @@ export async function updateChef(chefId, data) {
   }
 
   if (data.isDeactivatedByAdmin !== undefined) {
-    updatePayload.isDeactivatedByAdmin = Boolean(data.isDeactivatedByAdmin);
-  }
-  if (data.isActive !== undefined) {
+    const isDeactivated = Boolean(data.isDeactivatedByAdmin);
+    updatePayload.isDeactivatedByAdmin = isDeactivated;
+    if (isDeactivated) {
+      updatePayload.isActive = false;
+      updatePayload.status = "disabled";
+    } else {
+      updatePayload.status = "enabled";
+      if (data.isActive !== undefined) {
+        updatePayload.isActive = Boolean(data.isActive);
+      }
+    }
+  } else if (data.isActive !== undefined) {
     updatePayload.isActive = Boolean(data.isActive);
+  }
+
+  // Double check invariant: if admin deactivated, isActive is ALWAYS false
+  if (updatePayload.isDeactivatedByAdmin) {
+    updatePayload.isActive = false;
+    updatePayload.status = "disabled";
   }
   if (data.flatNumber !== undefined) updatePayload.flatNumber = data.flatNumber;
   if (data.floor !== undefined) updatePayload.floor = data.floor;
@@ -339,18 +360,28 @@ export async function updateChef(chefId, data) {
 
 /**
  * Toggles isDeactivatedByAdmin on the chef document.
- * When true: chef login is blocked even if chef toggles isActive on the mobile app.
- * When false: chef can self-manage their isActive status again.
+ * When true: chef login is blocked and isActive becomes false.
+ * When false: chef is re-enabled.
  */
 export async function toggleAdminDeactivation(chefId, deactivate) {
   if (!isFirebaseConfigured || !db) {
     throw new Error("Firebase is not configured.");
   }
 
-  await updateDoc(doc(db, COLLECTION_NAME, chefId), {
-    isDeactivatedByAdmin: Boolean(deactivate),
+  const isDeactivated = Boolean(deactivate);
+  const updateData = {
+    isDeactivatedByAdmin: isDeactivated,
     updatedAt: serverTimestamp(),
-  });
+  };
+
+  if (isDeactivated) {
+    updateData.isActive = false;
+    updateData.status = "disabled";
+  } else {
+    updateData.status = "enabled";
+  }
+
+  await updateDoc(doc(db, COLLECTION_NAME, chefId), updateData);
 
   // Sync to society subcollections
   try {
@@ -360,7 +391,8 @@ export async function toggleAdminDeactivation(chefId, deactivate) {
         const subRef = doc(db, "societies", socDoc.id, "chefs", chefId);
         try {
           await updateDoc(subRef, {
-            isDeactivatedByAdmin: Boolean(deactivate),
+            isDeactivatedByAdmin: isDeactivated,
+            ...(isDeactivated ? { isActive: false, status: "disabled" } : { status: "enabled" }),
           });
         } catch {}
       })

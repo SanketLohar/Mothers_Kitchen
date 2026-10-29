@@ -529,9 +529,18 @@ export function ChefManagementPage() {
 
     const deactivate = !target.isDeactivatedByAdmin;
 
-    // Optimistic UI update
+    // Optimistic UI update: when deactivating, isActive MUST become false!
     setChefs((prev) =>
-      prev.map((c) => (c.id === chefId ? { ...c, isDeactivatedByAdmin: deactivate } : c))
+      prev.map((c) =>
+        c.id === chefId
+          ? {
+              ...c,
+              isDeactivatedByAdmin: deactivate,
+              isActive: deactivate ? false : c.isActive,
+              status: deactivate ? "disabled" : "enabled",
+            }
+          : c
+      )
     );
 
     if (isFirebaseConfigured && !chefId.startsWith("chef-")) {
@@ -542,7 +551,16 @@ export function ChefManagementPage() {
         toast.error("Failed to update status in database.");
         // revert
         setChefs((prev) =>
-          prev.map((c) => (c.id === chefId ? { ...c, isDeactivatedByAdmin: !deactivate } : c))
+          prev.map((c) =>
+            c.id === chefId
+              ? {
+                  ...c,
+                  isDeactivatedByAdmin: !deactivate,
+                  isActive: !deactivate ? false : c.isActive,
+                  status: !deactivate ? "disabled" : "enabled",
+                }
+              : c
+          )
         );
         return;
       }
@@ -550,8 +568,8 @@ export function ChefManagementPage() {
 
     toast.success(
       deactivate
-        ? `${target.fullName} has been Admin-Deactivated. They cannot log in until you re-enable them.`
-        : `${target.fullName} has been re-enabled by Admin. Chef can now self-manage login.`
+        ? `${target.fullName} has been Admin-Deactivated. They cannot log in and are offline.`
+        : `${target.fullName} has been re-enabled by Admin. Chef can now take orders.`
     );
   };
 
@@ -596,8 +614,13 @@ export function ChefManagementPage() {
       return;
     }
 
+    const isDeactivated = Boolean(formData.isDeactivatedByAdmin);
     const payload = {
       ...formData,
+      isDeactivatedByAdmin: isDeactivated,
+      // When deactivated by admin, isActive MUST be false!
+      isActive: isDeactivated ? false : Boolean(formData.isActive),
+      status: isDeactivated ? "disabled" : (formData.isActive ? "enabled" : "offline"),
       fullName: toTitleCase(chefName),
       city: toTitleCase(formData.city),
       area: toTitleCase(formData.area),
@@ -615,6 +638,20 @@ export function ChefManagementPage() {
       if (editingChef) {
         if (isFirebaseConfigured && !editingChef.id.startsWith("chef-")) {
           await updateChef(editingChef.id, payload);
+          // Update local state immediately for instant feedback
+          setChefs((prev) =>
+            prev.map((c) =>
+              c.id === editingChef.id
+                ? {
+                    ...c,
+                    ...payload,
+                    isDeactivatedByAdmin: isDeactivated,
+                    isActive: isDeactivated ? false : Boolean(payload.isActive),
+                    status: isDeactivated ? "disabled" : (payload.isActive ? "enabled" : "offline"),
+                  }
+                : c
+            )
+          );
           toast.success(`Chef "${payload.fullName}" profile updated in Firestore!`);
         } else {
           setChefs((prev) =>
@@ -623,6 +660,9 @@ export function ChefManagementPage() {
                 ? {
                     ...c,
                     ...payload,
+                    isDeactivatedByAdmin: isDeactivated,
+                    isActive: isDeactivated ? false : Boolean(payload.isActive),
+                    status: isDeactivated ? "disabled" : (payload.isActive ? "enabled" : "offline"),
                     idCardNumber: payload.idCardNumber,
                     aadharNumber: payload.aadharNumber,
                   }
@@ -1017,9 +1057,15 @@ export function ChefManagementPage() {
                         {/* Live Avatar Presence Badge */}
                         <span
                           className={`absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-white shadow-xs ${
-                            chef.isActive ? "bg-emerald-500" : "bg-zinc-400"
+                            !chef.isDeactivatedByAdmin && chef.isActive ? "bg-emerald-500" : "bg-zinc-400"
                           }`}
-                          title={chef.isActive ? "Chef is Active (Taking orders on app)" : "Chef is Offline on app"}
+                          title={
+                            chef.isDeactivatedByAdmin
+                              ? "Chef is Deactivated by Admin"
+                              : chef.isActive
+                              ? "Chef is Active (Taking orders on app)"
+                              : "Chef is Offline on app"
+                          }
                         />
                       </div>
                       <div>
@@ -1038,7 +1084,7 @@ export function ChefManagementPage() {
                         </div>
                         {/* Active on App Pill directly below Chef Name */}
                         <div className="flex items-center gap-2 mt-1">
-                          {chef.isActive ? (
+                          {!chef.isDeactivatedByAdmin && chef.isActive ? (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold shadow-2xs">
                               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                               <span>Active on App</span>
@@ -1046,7 +1092,7 @@ export function ChefManagementPage() {
                           ) : (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-zinc-100 border border-zinc-300 text-zinc-700 text-[10px] font-medium">
                               <span className="size-1.5 rounded-full bg-zinc-400" />
-                              <span>Offline on App</span>
+                              <span>{chef.isDeactivatedByAdmin ? "Deactivated by Admin" : "Offline on App"}</span>
                             </span>
                           )}
                         </div>
@@ -1091,6 +1137,20 @@ export function ChefManagementPage() {
                   </TableCell>
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleToggleAdminDeactivation(chef.id)}
+                        title={chef.isDeactivatedByAdmin ? "Re-enable Chef" : "Deactivate Chef (Block Access)"}
+                      >
+                        <Shield
+                          className={`size-4 ${
+                            chef.isDeactivatedByAdmin
+                              ? "text-rose-500 hover:text-rose-600"
+                              : "text-emerald-600 hover:text-emerald-700"
+                          }`}
+                        />
+                      </Button>
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1578,21 +1638,26 @@ export function ChefManagementPage() {
                 {/* 1. Admin Login Access Toggle */}
                 <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-foreground">Admin Login Access</Label>
+                    <Label className="text-xs font-bold text-foreground">Admin Account Access</Label>
                     <Badge variant={formData.isDeactivatedByAdmin ? "destructive" : "success"} className="text-[10px]">
-                      {formData.isDeactivatedByAdmin ? "Admin Blocked" : "Admin Enabled"}
+                      {formData.isDeactivatedByAdmin ? "Admin Deactivated" : "Admin Enabled"}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] text-muted-foreground max-w-[180px] leading-tight">
                       {formData.isDeactivatedByAdmin
-                        ? "Chef is blocked from logging in to mobile app."
-                        : "Chef can log in and fulfill society orders."}
+                        ? "Chef is deactivated/blocked by admin. App login blocked and offline."
+                        : "Chef account is active and allowed to take orders."}
                     </span>
                     <Switch
                       checked={!formData.isDeactivatedByAdmin}
                       onCheckedChange={(enabled) =>
-                        setFormData((prev) => ({ ...prev, isDeactivatedByAdmin: !enabled }))
+                        setFormData((prev) => ({
+                          ...prev,
+                          isDeactivatedByAdmin: !enabled,
+                          // When deactivating, isActive MUST become false!
+                          isActive: enabled ? prev.isActive : false,
+                        }))
                       }
                     />
                   </div>
@@ -1603,21 +1668,28 @@ export function ChefManagementPage() {
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-bold text-foreground">Chef App Availability</Label>
                     <Badge
-                      variant={formData.isActive ? "success" : "secondary"}
-                      className={`text-[10px] gap-1 ${formData.isActive ? "bg-emerald-500/15 text-emerald-800 border-emerald-300" : ""}`}
+                      variant={!formData.isDeactivatedByAdmin && formData.isActive ? "success" : "secondary"}
+                      className={`text-[10px] gap-1 ${!formData.isDeactivatedByAdmin && formData.isActive ? "bg-emerald-500/15 text-emerald-800 border-emerald-300" : ""}`}
                     >
-                      <span className={`size-1.5 rounded-full ${formData.isActive ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
-                      {formData.isActive ? "Active on App" : "Offline on App"}
+                      <span className={`size-1.5 rounded-full ${!formData.isDeactivatedByAdmin && formData.isActive ? "bg-emerald-500 animate-pulse" : "bg-zinc-400"}`} />
+                      {formData.isDeactivatedByAdmin
+                        ? "Deactivated by Admin"
+                        : formData.isActive
+                        ? "Active on App"
+                        : "Offline on App"}
                     </Badge>
                   </div>
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] text-muted-foreground max-w-[180px] leading-tight">
-                      {formData.isActive
+                      {formData.isDeactivatedByAdmin
+                        ? "Chef is deactivated by admin. Cannot be active on app."
+                        : formData.isActive
                         ? "Chef is active and taking orders on customer app."
                         : "Chef is offline and unavailable for orders."}
                     </span>
                     <Switch
-                      checked={Boolean(formData.isActive)}
+                      checked={!formData.isDeactivatedByAdmin && Boolean(formData.isActive)}
+                      disabled={formData.isDeactivatedByAdmin}
                       onCheckedChange={(active) =>
                         setFormData((prev) => ({ ...prev, isActive: active }))
                       }
@@ -1849,11 +1921,15 @@ export function ChefManagementPage() {
               <span className="text-muted-foreground">Status:</span>
               <div className="flex flex-col items-end gap-1">
                 <Badge variant={viewingChef?.isDeactivatedByAdmin ? "destructive" : "success"}>
-                  {viewingChef?.isDeactivatedByAdmin ? "Admin Blocked" : "Admin Enabled"}
+                  {viewingChef?.isDeactivatedByAdmin ? "Admin Deactivated" : "Admin Enabled"}
                 </Badge>
                 <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <span className={`size-1.5 rounded-full inline-block ${viewingChef?.isActive ? "bg-emerald-500" : "bg-zinc-400"}`} />
-                  {viewingChef?.isActive ? "Chef Self-Active" : "Chef Self-Inactive (via Mobile App)"}
+                  <span className={`size-1.5 rounded-full inline-block ${!viewingChef?.isDeactivatedByAdmin && viewingChef?.isActive ? "bg-emerald-500" : "bg-zinc-400"}`} />
+                  {viewingChef?.isDeactivatedByAdmin
+                    ? "Deactivated by Admin"
+                    : viewingChef?.isActive
+                    ? "Active on App"
+                    : "Offline on App"}
                 </span>
               </div>
             </div>
