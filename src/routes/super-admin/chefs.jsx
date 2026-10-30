@@ -77,6 +77,7 @@ import {
   subscribeToChefs,
   createChef,
   updateChef,
+  updateChefStatus,
   toggleAdminDeactivation,
   deleteChef,
 } from "@/services/chefService";
@@ -269,7 +270,15 @@ export function ChefManagementPage() {
   const availableWingsForSociety = useMemo(() => {
     if (!currentBaseSocietyObj) return [];
     if (currentBaseSocietyObj.wings && currentBaseSocietyObj.wings.length > 0) {
-      return currentBaseSocietyObj.wings;
+      return currentBaseSocietyObj.wings.map((w) => {
+        if (typeof w === "string") {
+          return { name: w.replace(/^wing\s*/i, "").trim(), floors: 10 };
+        }
+        return {
+          name: (w?.name || "A").replace(/^wing\s*/i, "").trim(),
+          floors: Number(w?.floors || 10),
+        };
+      });
     }
     return [{ name: "A", floors: 10 }];
   }, [currentBaseSocietyObj]);
@@ -482,6 +491,9 @@ export function ChefManagementPage() {
     const chefWing = chef.wing || (foundSoc?.wings?.[0]?.name ? toTitleCase(foundSoc.wings[0].name) : "A");
     const chefFloor = chef.floor || "1";
 
+    const isDeactivated = Boolean(chef.isDeactivatedByAdmin);
+    const isActive = isDeactivated ? false : (chef.isActive !== undefined ? Boolean(chef.isActive) : true);
+
     setFormData({
       fullName: toTitleCase(chef.fullName || chef.name || ""),
       email: chef.email || "",
@@ -491,15 +503,15 @@ export function ChefManagementPage() {
       city: chefCity,
       area: chefArea,
       baseSociety: chefBaseSoc,
-      flatNumber: chef.flatNumber || "",
+      flatNumber: chef.flatNumber || "1",
       floor: chefFloor,
       wing: chefWing,
       street: chef.street || "",
-      address: chef.address || updateFormattedAddress(chef.flatNumber, chefFloor, chefWing, chefBaseSoc, chefArea, chefCity),
+      address: chef.address || updateFormattedAddress(chef.flatNumber || "1", chefFloor, chefWing, chefBaseSoc, chefArea, chefCity),
       assignedSocieties: chef.assignedSocieties || (chefBaseSoc ? [chefBaseSoc] : []),
       defaultPassword: "••••••••",
-      isDeactivatedByAdmin: Boolean(chef.isDeactivatedByAdmin),
-      isActive: chef.isActive !== undefined ? Boolean(chef.isActive) : true,
+      isDeactivatedByAdmin: isDeactivated,
+      isActive: isActive,
     });
     setAssignFilterCity("all");
     setAssignFilterArea("all");
@@ -521,6 +533,92 @@ export function ChefManagementPage() {
         };
       }
     });
+  };
+
+  const handleToggleAdminAccess = async (enabled) => {
+    const newDeactivated = !enabled;
+    // When deactivating, isActive must strictly become false
+    const newActive = newDeactivated ? false : Boolean(formData.isActive);
+
+    setFormData((prev) => ({
+      ...prev,
+      isDeactivatedByAdmin: newDeactivated,
+      isActive: newActive,
+    }));
+
+    if (editingChef && isFirebaseConfigured && !editingChef.id.startsWith("chef-")) {
+      try {
+        await updateChefStatus(editingChef.id, {
+          isDeactivatedByAdmin: newDeactivated,
+          isActive: newActive,
+        });
+
+        setChefs((prev) =>
+          prev.map((c) =>
+            c.id === editingChef.id
+              ? {
+                  ...c,
+                  isDeactivatedByAdmin: newDeactivated,
+                  isActive: newActive,
+                  status: newDeactivated ? "disabled" : (newActive ? "enabled" : "offline"),
+                }
+              : c
+          )
+        );
+
+        toast.success(
+          newDeactivated
+            ? `Admin Deactivated: isDeactivatedByAdmin = true, isActive = false`
+            : `Admin Enabled: isDeactivatedByAdmin = false`
+        );
+      } catch (err) {
+        console.error("Failed to update admin deactivation in Firestore:", err);
+        toast.error("Failed to update status in Firestore: " + err.message);
+      }
+    }
+  };
+
+  const handleToggleAppAvailability = async (active) => {
+    const newActive = Boolean(active);
+    // If setting active on app, chef cannot be deactivated by admin
+    const newDeactivated = newActive ? false : Boolean(formData.isDeactivatedByAdmin);
+
+    setFormData((prev) => ({
+      ...prev,
+      isActive: newActive,
+      isDeactivatedByAdmin: newDeactivated,
+    }));
+
+    if (editingChef && isFirebaseConfigured && !editingChef.id.startsWith("chef-")) {
+      try {
+        await updateChefStatus(editingChef.id, {
+          isActive: newActive,
+          isDeactivatedByAdmin: newDeactivated,
+        });
+
+        setChefs((prev) =>
+          prev.map((c) =>
+            c.id === editingChef.id
+              ? {
+                  ...c,
+                  isActive: newActive,
+                  isDeactivatedByAdmin: newDeactivated,
+                  status: newDeactivated ? "disabled" : (newActive ? "enabled" : "offline"),
+                }
+              : c
+          )
+        );
+
+        toast.success(
+          newActive
+            ? `Chef App Availability: isActive = true`
+            : `Chef App Availability: isActive = false (Offline)`
+        );
+      } catch (err) {
+        console.error("Failed to update app availability in Firestore:", err);
+        toast.error("Failed to update availability in Firestore: " + err.message);
+      }
+    }
   };
 
   const handleToggleAdminDeactivation = async (chefId) => {
@@ -584,7 +682,7 @@ export function ChefManagementPage() {
       return;
     }
 
-    if (!formData.photoUrl || !formData.photoUrl.trim()) {
+    if (!editingChef && (!formData.photoUrl || !formData.photoUrl.trim())) {
       toast.error("Chef photograph is mandatory for registration. Please upload a photo.");
       return;
     }
@@ -594,43 +692,33 @@ export function ChefManagementPage() {
       return;
     }
 
-    if (!formData.flatNumber) {
-      toast.error("Please enter Flat Number.");
-      return;
-    }
-
-    if (!formData.floor) {
-      toast.error("Please select a Floor.");
-      return;
-    }
-
-    if (!formData.wing) {
-      toast.error("Please select a Wing / Building.");
-      return;
-    }
-
-    if (!formData.assignedSocieties.length) {
-      toast.error("Please assign at least one deliverable society.");
-      return;
-    }
+    const flatNumber = String(formData.flatNumber || "1").trim();
+    const floor = String(formData.floor || "1").trim();
+    const wing = String(formData.wing || (availableWingsForSociety[0]?.name || "A")).trim();
+    const assignedSocieties = formData.assignedSocieties && formData.assignedSocieties.length > 0
+      ? formData.assignedSocieties
+      : (formData.baseSociety ? [formData.baseSociety] : []);
 
     const isDeactivated = Boolean(formData.isDeactivatedByAdmin);
+    const isActive = isDeactivated ? false : Boolean(formData.isActive);
+
     const payload = {
       ...formData,
       isDeactivatedByAdmin: isDeactivated,
       // When deactivated by admin, isActive MUST be false!
-      isActive: isDeactivated ? false : Boolean(formData.isActive),
-      status: isDeactivated ? "disabled" : (formData.isActive ? "enabled" : "offline"),
+      isActive: isActive,
+      status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
       fullName: toTitleCase(chefName),
       city: toTitleCase(formData.city),
       area: toTitleCase(formData.area),
       baseSociety: toTitleCase(formData.baseSociety),
-      flatNumber: String(formData.flatNumber || "").trim(),
-      floor: String(formData.floor || "").trim(),
-      wing: String(formData.wing || "").trim(),
+      flatNumber,
+      floor,
+      wing,
       street: toTitleCase(formData.street || ""),
       idCardNumber: (formData.idCardNumber || "").trim(),
       aadharNumber: (formData.idCardNumber || "").trim(),
+      assignedSocieties,
     };
 
     setIsSubmitting(true);
@@ -646,8 +734,8 @@ export function ChefManagementPage() {
                     ...c,
                     ...payload,
                     isDeactivatedByAdmin: isDeactivated,
-                    isActive: isDeactivated ? false : Boolean(payload.isActive),
-                    status: isDeactivated ? "disabled" : (payload.isActive ? "enabled" : "offline"),
+                    isActive: isActive,
+                    status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
                   }
                 : c
             )
@@ -661,8 +749,8 @@ export function ChefManagementPage() {
                     ...c,
                     ...payload,
                     isDeactivatedByAdmin: isDeactivated,
-                    isActive: isDeactivated ? false : Boolean(payload.isActive),
-                    status: isDeactivated ? "disabled" : (payload.isActive ? "enabled" : "offline"),
+                    isActive: isActive,
+                    status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
                     idCardNumber: payload.idCardNumber,
                     aadharNumber: payload.aadharNumber,
                   }
@@ -681,8 +769,8 @@ export function ChefManagementPage() {
             id: `chef-${Date.now()}`,
             ...payload,
             email: payload.email.trim() || `${cleanM}@motherskitchen.com`,
-            status: "enabled",
-            isDailyActive: true,
+            status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
+            isDailyActive: isActive,
           };
           setChefs((prev) => [newChef, ...prev]);
           toast.success(
@@ -1651,14 +1739,7 @@ export function ChefManagementPage() {
                     </span>
                     <Switch
                       checked={!formData.isDeactivatedByAdmin}
-                      onCheckedChange={(enabled) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          isDeactivatedByAdmin: !enabled,
-                          // When deactivating, isActive MUST become false!
-                          isActive: enabled ? prev.isActive : false,
-                        }))
-                      }
+                      onCheckedChange={(enabled) => handleToggleAdminAccess(enabled)}
                     />
                   </div>
                 </div>
@@ -1690,9 +1771,7 @@ export function ChefManagementPage() {
                     <Switch
                       checked={!formData.isDeactivatedByAdmin && Boolean(formData.isActive)}
                       disabled={formData.isDeactivatedByAdmin}
-                      onCheckedChange={(active) =>
-                        setFormData((prev) => ({ ...prev, isActive: active }))
-                      }
+                      onCheckedChange={(active) => handleToggleAppAvailability(active)}
                     />
                   </div>
                 </div>
