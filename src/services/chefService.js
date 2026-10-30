@@ -90,15 +90,30 @@ export function subscribeToChefs(callback, onError) {
       const list = snapshot.docs.map((docSnap) => {
         const data = docSnap.data();
         const cleanMobile = (data.mobileNumber || "").replace(/\D/g, "");
-        const isDeactivated = Boolean(data.isDeactivatedByAdmin);
+
+        // Single source of truth:
+        // 1. If data.isActive is explicitly true in Firestore, the chef IS ACTIVE on the app!
+        const isActive = Boolean(data.isActive);
+        // 2. A chef is only considered admin-deactivated if isDeactivatedByAdmin is true AND isActive is false.
+        // If a chef became active again on the app, admin deactivation is automatically superseded.
+        const isDeactivated = Boolean(data.isDeactivatedByAdmin) && !isActive;
+
+        // Auto-heal in Firestore in background if chef became active while isDeactivatedByAdmin was still true
+        if (data.isActive === true && (data.isDeactivatedByAdmin === true || data.status === "disabled")) {
+          updateDoc(docSnap.ref, {
+            isDeactivatedByAdmin: false,
+            status: "enabled",
+            updatedAt: serverTimestamp(),
+          }).catch((err) => console.warn("Auto-heal isDeactivatedByAdmin error:", err));
+        }
+
         return {
           id: docSnap.id,
           ...data,
           fullName: data.fullName || data.name || "Chef",
+          isActive,
           isDeactivatedByAdmin: isDeactivated,
-          // When deactivated by admin, isActive is strictly false
-          isActive: isDeactivated ? false : (data.isActive !== false && data.status !== "disabled"),
-          status: isDeactivated ? "disabled" : (data.status || "enabled"),
+          status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
           loginMobile: data.loginMobile || cleanMobile,
           authEmail: data.authEmail || (cleanMobile ? `${cleanMobile}@motherskitchen.com` : ""),
           password: data.password || data.defaultPassword || "",

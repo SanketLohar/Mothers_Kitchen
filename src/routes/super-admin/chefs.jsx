@@ -1145,13 +1145,13 @@ export function ChefManagementPage() {
                         {/* Live Avatar Presence Badge */}
                         <span
                           className={`absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-white shadow-xs ${
-                            !chef.isDeactivatedByAdmin && chef.isActive ? "bg-emerald-500" : "bg-zinc-400"
+                            chef.isActive ? "bg-emerald-500" : "bg-zinc-400"
                           }`}
                           title={
-                            chef.isDeactivatedByAdmin
-                              ? "Chef is Deactivated by Admin"
-                              : chef.isActive
+                            chef.isActive
                               ? "Chef is Active (Taking orders on app)"
+                              : chef.isDeactivatedByAdmin
+                              ? "Chef is Deactivated by Admin"
                               : "Chef is Offline on app"
                           }
                         />
@@ -1164,7 +1164,7 @@ export function ChefManagementPage() {
                           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
                             {chef.id}
                           </span>
-                          {chef.isDeactivatedByAdmin && (
+                          {chef.isDeactivatedByAdmin && !chef.isActive && (
                             <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-800 font-semibold border border-rose-200">
                               Blocked
                             </span>
@@ -1172,7 +1172,7 @@ export function ChefManagementPage() {
                         </div>
                         {/* Active on App Pill directly below Chef Name */}
                         <div className="flex items-center gap-2 mt-1">
-                          {!chef.isDeactivatedByAdmin && chef.isActive ? (
+                          {chef.isActive ? (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold shadow-2xs">
                               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
                               <span>Active on App</span>
@@ -1999,15 +1999,15 @@ export function ChefManagementPage() {
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Status:</span>
               <div className="flex flex-col items-end gap-1">
-                <Badge variant={viewingChef?.isDeactivatedByAdmin ? "destructive" : "success"}>
-                  {viewingChef?.isDeactivatedByAdmin ? "Admin Deactivated" : "Admin Enabled"}
+                <Badge variant={!viewingChef?.isActive && viewingChef?.isDeactivatedByAdmin ? "destructive" : "success"}>
+                  {!viewingChef?.isActive && viewingChef?.isDeactivatedByAdmin ? "Admin Deactivated" : "Admin Enabled"}
                 </Badge>
                 <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <span className={`size-1.5 rounded-full inline-block ${!viewingChef?.isDeactivatedByAdmin && viewingChef?.isActive ? "bg-emerald-500" : "bg-zinc-400"}`} />
-                  {viewingChef?.isDeactivatedByAdmin
-                    ? "Deactivated by Admin"
-                    : viewingChef?.isActive
+                  <span className={`size-1.5 rounded-full inline-block ${viewingChef?.isActive ? "bg-emerald-500" : "bg-zinc-400"}`} />
+                  {viewingChef?.isActive
                     ? "Active on App"
+                    : viewingChef?.isDeactivatedByAdmin
+                    ? "Deactivated by Admin"
                     : "Offline on App"}
                 </span>
               </div>
