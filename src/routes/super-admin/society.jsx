@@ -1003,28 +1003,15 @@ export function SocietyManagementPage() {
                 </div>
               </div>
 
-              {/* Dynamic Wings & Floor config with Add Wing (+) Button */}
+              {/* Dynamic Wings & Floor config */}
               <div className="space-y-2 pt-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                      Floors Per Wing:
-                    </Label>
-                    <Badge variant="outline" className="text-[10px] font-mono">
-                      {formData.wings.length} {formData.wings.length === 1 ? "Wing" : "Wings"}
-                    </Badge>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleAddWing}
-                    disabled={formData.wings.length >= 26}
-                    className="h-7 px-2.5 text-xs gap-1.5 border-primary/40 text-primary hover:bg-primary hover:text-white cursor-pointer rounded-lg font-semibold"
-                  >
-                    <Plus className="size-3.5" />
-                    <span>Add Wing</span>
-                  </Button>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    Floors Per Wing:
+                  </Label>
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    {formData.wings.length} {formData.wings.length === 1 ? "Wing" : "Wings"}
+                  </Badge>
                 </div>
 
                 <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
