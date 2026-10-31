@@ -119,7 +119,13 @@ export function subscribeToChefs(callback, onError) {
           password: data.password || data.defaultPassword || "",
           defaultPassword: data.defaultPassword || data.password || "",
           assignedSocieties: Array.isArray(data.assignedSocieties) ? data.assignedSocieties : [],
-          activeDeliverableSocieties: Array.isArray(data.activeDeliverableSocieties) ? data.activeDeliverableSocieties : [],
+          activeDeliverableSocieties: Array.isArray(data.activeDeliverableSocieties)
+            ? data.activeDeliverableSocieties
+            : Array.isArray(data.deliverableSocieties)
+            ? data.deliverableSocieties.filter((s) => typeof s === "string" && !s.startsWith("soc_"))
+            : Array.isArray(data.assignedSocieties)
+            ? data.assignedSocieties
+            : [],
           ordersToday: Number(data.ordersToday || 0),
           rating: Number(data.rating || 5.0),
         };
