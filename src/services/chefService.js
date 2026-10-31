@@ -364,6 +364,7 @@ export async function updateChef(chefId, data) {
   if (data.city !== undefined) updatePayload.city = data.city;
   if (data.area !== undefined) updatePayload.area = data.area;
   if (data.aadharNumber !== undefined) updatePayload.aadharNumber = data.aadharNumber;
+  if (Array.isArray(data.activeDeliverableSocieties)) updatePayload.activeDeliverableSocieties = data.activeDeliverableSocieties;
 
   await updateDoc(docRef, updatePayload);
 

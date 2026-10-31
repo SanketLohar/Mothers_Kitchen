@@ -2037,9 +2037,14 @@ export function ChefManagementPage() {
               <span className="text-xs text-right max-w-xs">{viewingChef?.address}</span>
             </div>
             <div className="space-y-1 pt-1">
-              <span className="text-xs font-bold text-muted-foreground uppercase">
-                Admin Allocated Delivery Societies ({viewingChef?.assignedSocieties?.length || 0}):
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-muted-foreground uppercase">
+                  Admin Allocated Delivery Societies ({viewingChef?.assignedSocieties?.length || 0}):
+                </span>
+                <span className="text-[10px] text-muted-foreground bg-muted/60 border border-border px-2 py-0.5 rounded-full font-medium">
+                  Super Admin Approved
+                </span>
+              </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {viewingChef?.assignedSocieties?.length ? (
                   viewingChef.assignedSocieties.map((s, i) => (
@@ -2049,6 +2054,40 @@ export function ChefManagementPage() {
                   ))
                 ) : (
                   <span className="text-xs text-muted-foreground italic">None allocated</span>
+                )}
+              </div>
+            </div>
+
+            {/* Chef Active Deliverable Societies (Chosen by Chef on Mobile App) */}
+            <div className="space-y-1.5 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                  <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Chef Active Deliverable Societies ({viewingChef?.activeDeliverableSocieties?.length || 0}):</span>
+                </span>
+                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                  Live on Chef App
+                </span>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Societies where this chef is actively delivering (chosen &amp; toggled by the chef on mobile app).
+              </p>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                {viewingChef?.activeDeliverableSocieties?.length ? (
+                  viewingChef.activeDeliverableSocieties.map((s, i) => (
+                    <Badge
+                      key={i}
+                      variant="success"
+                      className="text-xs py-1 px-2.5 font-semibold bg-emerald-50 border-emerald-300 text-emerald-800 gap-1.5 shadow-2xs"
+                    >
+                      <span className="size-1.5 rounded-full bg-emerald-500" />
+                      <span>{toTitleCase(s)}</span>
+                    </Badge>
+                  ))
+                ) : (
+                  <span className="text-xs text-muted-foreground italic">
+                    None selected (Chef has not chosen any active delivery societies on app)
+                  </span>
                 )}
               </div>
             </div>
