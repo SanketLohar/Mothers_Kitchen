@@ -565,7 +565,7 @@ export function ChefManagementPage() {
                   ...c,
                   isDeactivatedByAdmin: newDeactivated,
                   isActive: newActive,
-                  status: newDeactivated ? "disabled" : (newActive ? "enabled" : "offline"),
+                  status: newDeactivated ? "disabled" : "enabled",
                 }
               : c
           )
@@ -608,7 +608,7 @@ export function ChefManagementPage() {
                   ...c,
                   isActive: newActive,
                   isDeactivatedByAdmin: newDeactivated,
-                  status: newDeactivated ? "disabled" : (newActive ? "enabled" : "offline"),
+                  status: newDeactivated ? "disabled" : "enabled",
                 }
               : c
           )
@@ -712,7 +712,7 @@ export function ChefManagementPage() {
       isDeactivatedByAdmin: isDeactivated,
       // When deactivated by admin, isActive MUST be false!
       isActive: isActive,
-      status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
+      status: isDeactivated ? "disabled" : "enabled",
       fullName: toTitleCase(chefName),
       city: toTitleCase(formData.city),
       area: toTitleCase(formData.area),
@@ -740,7 +740,7 @@ export function ChefManagementPage() {
                     ...payload,
                     isDeactivatedByAdmin: isDeactivated,
                     isActive: isActive,
-                    status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
+                    status: isDeactivated ? "disabled" : "enabled",
                   }
                 : c
             )
@@ -755,7 +755,7 @@ export function ChefManagementPage() {
                     ...payload,
                     isDeactivatedByAdmin: isDeactivated,
                     isActive: isActive,
-                    status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
+                    status: isDeactivated ? "disabled" : "enabled",
                     idCardNumber: payload.idCardNumber,
                     aadharNumber: payload.aadharNumber,
                   }
@@ -774,7 +774,7 @@ export function ChefManagementPage() {
             id: `chef-${Date.now()}`,
             ...payload,
             email: payload.email.trim() || `${cleanM}@motherskitchen.com`,
-            status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
+            status: isDeactivated ? "disabled" : "enabled",
             isDailyActive: isActive,
           };
           setChefs((prev) => [newChef, ...prev]);

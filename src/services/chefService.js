@@ -97,9 +97,11 @@ export function subscribeToChefs(callback, onError) {
         // 2. A chef is only considered admin-deactivated if isDeactivatedByAdmin is true AND isActive is false.
         // If a chef became active again on the app, admin deactivation is automatically superseded.
         const isDeactivated = Boolean(data.isDeactivatedByAdmin) && !isActive;
+        // Account approval status must strictly be 'enabled' or 'disabled' (NEVER 'offline', which is just isActive: false)
+        const accountStatus = isDeactivated ? "disabled" : "enabled";
 
-        // Auto-heal in Firestore in background if chef became active while isDeactivatedByAdmin was still true
-        if (data.isActive === true && (data.isDeactivatedByAdmin === true || data.status === "disabled")) {
+        // Auto-heal legacy or invalid statuses in Firestore so mobile app is never blocked
+        if (data.status === "offline" || (data.isActive === true && (data.isDeactivatedByAdmin === true || data.status === "disabled"))) {
           updateDoc(docSnap.ref, {
             isDeactivatedByAdmin: false,
             status: "enabled",
@@ -113,7 +115,7 @@ export function subscribeToChefs(callback, onError) {
           fullName: data.fullName || data.name || "Chef",
           isActive,
           isDeactivatedByAdmin: isDeactivated,
-          status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
+          status: accountStatus,
           loginMobile: data.loginMobile || cleanMobile,
           authEmail: data.authEmail || (cleanMobile ? `${cleanMobile}@motherskitchen.com` : ""),
           password: data.password || data.defaultPassword || "",
@@ -129,6 +131,13 @@ export function subscribeToChefs(callback, onError) {
           ordersToday: Number(data.ordersToday || 0),
           rating: Number(data.rating || 5.0),
         };
+      });
+
+      // Sort by createdAt descending robustly
+      list.sort((a, b) => {
+        const tA = a.createdAt?.toMillis ? a.createdAt.toMillis() : new Date(a.createdAt || 0).getTime() || 0;
+        const tB = b.createdAt?.toMillis ? b.createdAt.toMillis() : new Date(b.createdAt || 0).getTime() || 0;
+        return tB - tA;
       });
 
       callback(list, false);
@@ -213,7 +222,7 @@ export async function syncChefToSocieties(chefId, chefData, assignedSocieties, b
               baseSociety: chefData.baseSociety || "",
               isActive,
               isDeactivatedByAdmin: isDeactivated,
-              status: isDeactivated ? "disabled" : (isActive ? "enabled" : "offline"),
+              status: isDeactivated ? "disabled" : "enabled",
               assignedAt: serverTimestamp(),
             },
             { merge: true }
