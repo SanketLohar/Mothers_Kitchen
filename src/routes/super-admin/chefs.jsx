@@ -185,6 +185,11 @@ export function ChefManagementPage() {
   const [editingChef, setEditingChef] = useState(null);
   const [deleteChefId, setDeleteChefId] = useState(null);
   const [viewingChef, setViewingChef] = useState(null);
+  // Live reactive chef reference to ensure real-time updates inside the view modal without refresh
+  const activeViewingChef = useMemo(() => {
+    if (!viewingChef) return null;
+    return chefs.find((c) => c.id === viewingChef.id) || viewingChef;
+  }, [chefs, viewingChef]);
   const [previewImage, setPreviewImage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -1886,31 +1891,31 @@ export function ChefManagementPage() {
       </AlertDialog>
 
       {/* View Chef Profile Modal */}
-      <Dialog open={Boolean(viewingChef)} onOpenChange={(open) => !open && setViewingChef(null)}>
+      <Dialog open={Boolean(activeViewingChef)} onOpenChange={(open) => !open && setViewingChef(null)}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-3.5">
               <div
                 className="relative group cursor-pointer shrink-0"
                 onClick={() => {
-                  if (viewingChef?.photoUrl) {
+                  if (activeViewingChef?.photoUrl) {
                     setPreviewImage({
-                      url: viewingChef.photoUrl,
-                      title: toTitleCase(viewingChef.fullName),
-                      subtitle: `Chef ID: ${viewingChef.id} • Aadhar / ID: ${viewingChef.aadharNumber || viewingChef.idCardNumber || "—"}`,
+                      url: activeViewingChef.photoUrl,
+                      title: toTitleCase(activeViewingChef.fullName),
+                      subtitle: `Chef ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
                     });
                   }
                 }}
-                title={viewingChef?.photoUrl ? "Click to view full photo" : "No photo uploaded"}
+                title={activeViewingChef?.photoUrl ? "Click to view full photo" : "No photo uploaded"}
               >
                 <ChefAvatar
-                  photoUrl={viewingChef?.photoUrl}
-                  name={viewingChef?.fullName}
+                  photoUrl={activeViewingChef?.photoUrl}
+                  name={activeViewingChef?.fullName}
                   size="size-14"
                   textSize="text-base"
                   className="ring-2 ring-primary/25 group-hover:ring-primary group-hover:scale-105 transition-all shadow-md"
                 />
-                {viewingChef?.photoUrl && (
+                {activeViewingChef?.photoUrl && (
                   <span className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
                     <ZoomIn className="size-4 drop-shadow" />
                   </span>
@@ -1918,22 +1923,22 @@ export function ChefManagementPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-base">{toTitleCase(viewingChef?.fullName)}</span>
+                  <span className="font-bold text-base">{toTitleCase(activeViewingChef?.fullName)}</span>
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
-                    {viewingChef?.id}
+                    {activeViewingChef?.id}
                   </span>
                 </div>
                 <div className="text-xs text-muted-foreground font-normal">
-                  Aadhar / ID: {viewingChef?.aadharNumber || viewingChef?.idCardNumber || "—"}
+                  Aadhar / ID: {activeViewingChef?.aadharNumber || activeViewingChef?.idCardNumber || "—"}
                 </div>
-                {viewingChef?.photoUrl && (
+                {activeViewingChef?.photoUrl && (
                   <button
                     type="button"
                     onClick={() => {
                       setPreviewImage({
-                        url: viewingChef.photoUrl,
-                        title: toTitleCase(viewingChef.fullName),
-                        subtitle: `Chef ID: ${viewingChef.id} • Aadhar / ID: ${viewingChef.aadharNumber || viewingChef.idCardNumber || "—"}`,
+                        url: activeViewingChef.photoUrl,
+                        title: toTitleCase(activeViewingChef.fullName),
+                        subtitle: `Chef ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
                       });
                     }}
                     className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 mt-1 cursor-pointer"
@@ -1959,7 +1964,7 @@ export function ChefManagementPage() {
                   variant="outline"
                   className="h-7 text-xs gap-1"
                   onClick={() => {
-                    const text = `Hello ${viewingChef?.fullName || "Chef"}! Welcome to Mother's Kitchen.\n\nYour Chef Mobile App Login:\n• Mobile Number: ${viewingChef?.mobileNumber}\n• Password: ${viewingChef?.defaultPassword || viewingChef?.password || "—"}\n\nPlease keep your credentials safe.`;
+                    const text = `Hello ${activeViewingChef?.fullName || "Chef"}! Welcome to Mother's Kitchen.\n\nYour Chef Mobile App Login:\n• Mobile Number: ${activeViewingChef?.mobileNumber}\n• Password: ${activeViewingChef?.defaultPassword || activeViewingChef?.password || "—"}\n\nPlease keep your credentials safe.`;
                     navigator.clipboard.writeText(text);
                     toast.success("Login details copied for WhatsApp!");
                   }}
@@ -1971,18 +1976,18 @@ export function ChefManagementPage() {
               <div className="grid grid-cols-2 gap-2 text-xs">
                 <div>
                   <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Login Mobile</span>
-                  <span className="font-mono font-bold text-foreground">{viewingChef?.mobileNumber}</span>
+                  <span className="font-mono font-bold text-foreground">{activeViewingChef?.mobileNumber}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Password</span>
                   <span className="font-mono font-bold text-primary">
-                    {viewingChef?.defaultPassword || viewingChef?.password || "—"}
+                    {activeViewingChef?.defaultPassword || activeViewingChef?.password || "—"}
                   </span>
                 </div>
                 <div className="col-span-2">
                   <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Auth Email ID</span>
                   <span className="font-mono text-muted-foreground text-[11px]">
-                    {viewingChef?.authEmail || `${(viewingChef?.mobileNumber || "").replace(/\D/g, "")}@motherskitchen.com`}
+                    {activeViewingChef?.authEmail || `${(activeViewingChef?.mobileNumber || "").replace(/\D/g, "")}@motherskitchen.com`}
                   </span>
                 </div>
               </div>
@@ -1990,23 +1995,23 @@ export function ChefManagementPage() {
 
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Mobile:</span>
-              <span className="font-semibold">{viewingChef?.mobileNumber}</span>
+              <span className="font-semibold">{activeViewingChef?.mobileNumber}</span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Email:</span>
-              <span className="font-semibold">{viewingChef?.email || "—"}</span>
+              <span className="font-semibold">{activeViewingChef?.email || "—"}</span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Status:</span>
               <div className="flex flex-col items-end gap-1">
-                <Badge variant={!viewingChef?.isActive && viewingChef?.isDeactivatedByAdmin ? "destructive" : "success"}>
-                  {!viewingChef?.isActive && viewingChef?.isDeactivatedByAdmin ? "Admin Deactivated" : "Admin Enabled"}
+                <Badge variant={!activeViewingChef?.isActive && activeViewingChef?.isDeactivatedByAdmin ? "destructive" : "success"}>
+                  {!activeViewingChef?.isActive && activeViewingChef?.isDeactivatedByAdmin ? "Admin Deactivated" : "Admin Enabled"}
                 </Badge>
                 <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <span className={`size-1.5 rounded-full inline-block ${viewingChef?.isActive ? "bg-emerald-500" : "bg-zinc-400"}`} />
-                  {viewingChef?.isActive
+                  <span className={`size-1.5 rounded-full inline-block ${activeViewingChef?.isActive ? "bg-emerald-500" : "bg-zinc-400"}`} />
+                  {activeViewingChef?.isActive
                     ? "Active on App"
-                    : viewingChef?.isDeactivatedByAdmin
+                    : activeViewingChef?.isDeactivatedByAdmin
                     ? "Deactivated by Admin"
                     : "Offline on App"}
                 </span>
@@ -2014,40 +2019,40 @@ export function ChefManagementPage() {
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Base Society:</span>
-              <span className="font-semibold">{toTitleCase(viewingChef?.baseSociety)}</span>
+              <span className="font-semibold">{toTitleCase(activeViewingChef?.baseSociety)}</span>
             </div>
-            {(viewingChef?.flatNumber || viewingChef?.wing || viewingChef?.floor) && (
+            {(activeViewingChef?.flatNumber || activeViewingChef?.wing || activeViewingChef?.floor) && (
               <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">Residence Flat / Wing:</span>
                 <span className="font-semibold text-right">
-                  {viewingChef?.flatNumber ? `Flat ${viewingChef.flatNumber}` : ""}
-                  {viewingChef?.wing ? `, Wing ${toTitleCase(viewingChef.wing)}` : ""}
-                  {viewingChef?.floor ? `, Floor ${viewingChef.floor}` : ""}
+                  {activeViewingChef?.flatNumber ? `Flat ${activeViewingChef.flatNumber}` : ""}
+                  {activeViewingChef?.wing ? `, Wing ${toTitleCase(activeViewingChef.wing)}` : ""}
+                  {activeViewingChef?.floor ? `, Floor ${activeViewingChef.floor}` : ""}
                 </span>
               </div>
             )}
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Location (City / Area):</span>
               <span className="font-semibold">
-                {toTitleCase(viewingChef?.city || "")}{viewingChef?.area ? ` / ${toTitleCase(viewingChef?.area)}` : ""}
+                {toTitleCase(activeViewingChef?.city || "")}{activeViewingChef?.area ? ` / ${toTitleCase(activeViewingChef?.area)}` : ""}
               </span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Complete Address:</span>
-              <span className="text-xs text-right max-w-xs">{viewingChef?.address}</span>
+              <span className="text-xs text-right max-w-xs">{activeViewingChef?.address}</span>
             </div>
             <div className="space-y-1 pt-1">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase">
-                  Admin Allocated Delivery Societies ({viewingChef?.assignedSocieties?.length || 0}):
+                  Admin Allocated Delivery Societies ({activeViewingChef?.assignedSocieties?.length || 0}):
                 </span>
                 <span className="text-[10px] text-muted-foreground bg-muted/60 border border-border px-2 py-0.5 rounded-full font-medium">
                   Super Admin Approved
                 </span>
               </div>
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {viewingChef?.assignedSocieties?.length ? (
-                  viewingChef.assignedSocieties.map((s, i) => (
+                {activeViewingChef?.assignedSocieties?.length ? (
+                  activeViewingChef.assignedSocieties.map((s, i) => (
                     <Badge key={i} variant="outline" className="text-xs py-1 px-2 font-medium">
                       {toTitleCase(s)}
                     </Badge>
@@ -2063,7 +2068,7 @@ export function ChefManagementPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Chef Active Deliverable Societies ({viewingChef?.activeDeliverableSocieties?.length || 0}):</span>
+                  <span>Chef Active Deliverable Societies ({activeViewingChef?.activeDeliverableSocieties?.length || 0}):</span>
                 </span>
                 <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
                   Live on Chef App
@@ -2073,8 +2078,8 @@ export function ChefManagementPage() {
                 Societies where this chef is actively delivering (chosen &amp; toggled by the chef on mobile app).
               </p>
               <div className="flex flex-wrap gap-1.5 pt-1">
-                {viewingChef?.activeDeliverableSocieties?.length ? (
-                  viewingChef.activeDeliverableSocieties.map((s, i) => (
+                {activeViewingChef?.activeDeliverableSocieties?.length ? (
+                  activeViewingChef.activeDeliverableSocieties.map((s, i) => (
                     <Badge
                       key={i}
                       variant="success"
@@ -2097,7 +2102,7 @@ export function ChefManagementPage() {
               type="button"
               variant="outline"
               onClick={() => {
-                const target = viewingChef;
+                const target = activeViewingChef;
                 setViewingChef(null);
                 handleOpenEditModal(target);
               }}
