@@ -918,13 +918,17 @@ export function ChefManagementPage() {
         selectedBaseSociety === "all" ||
         String(c.baseSociety || "").toLowerCase() === selectedBaseSociety.toLowerCase();
 
-      // Check Delivering Society match (from assignedSocieties or activeDeliverableSocieties)
-      const deliveringSocieties = Array.from(
-        new Set([...(c.assignedSocieties || []), ...(c.activeDeliverableSocieties || [])].filter(Boolean))
-      );
+      // Check Delivering Society match (strictly uses activeDeliverableSocieties as single source of truth)
+      const activeDeliverable = Array.isArray(c.activeDeliverableSocieties) ? c.activeDeliverableSocieties : [];
       const matchesDeliveringSociety =
         selectedDeliveringSociety === "all" ||
-        deliveringSocieties.some((ds) => String(ds).toLowerCase() === selectedDeliveringSociety.toLowerCase());
+        activeDeliverable.some((ds) => {
+          const dsLower = String(ds).toLowerCase();
+          const targetLower = selectedDeliveringSociety.toLowerCase();
+          if (dsLower === targetLower) return true;
+          const matchedSoc = societiesList.find((s) => s.id === ds || s.name === ds);
+          return matchedSoc && matchedSoc.name.toLowerCase() === targetLower;
+        });
 
       return matchesSearch && matchesStatus && matchesCity && matchesArea && matchesBaseSociety && matchesDeliveringSociety;
     });
