@@ -56,12 +56,16 @@ export function HighlightsPage() {
         setHighlights((prev) => {
           return list.map((remote) => {
             const local = prev.find((p) => p.slotNumber === remote.slotNumber);
+            // If the user has made unsaved local edits, preserve them!
+            if (local?.isDirty) {
+              return {
+                ...remote,
+                ...local,
+              };
+            }
             return {
               ...remote,
-              // If remote is empty but local has pending image/text, preserve local
-              imageUrl: remote.imageUrl || local?.imageUrl || "",
-              title: remote.title || local?.title || "",
-              subtitle: remote.subtitle || local?.subtitle || "",
+              isDirty: false,
             };
           });
         });
@@ -130,6 +134,9 @@ export function HighlightsPage() {
     if (isFirebaseConfigured) {
       try {
         await saveHighlightSlot(slotNumber, target);
+        setHighlights((prev) =>
+          prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
+        );
         toast.success(`Slot #${slotNumber} successfully saved to Firestore!`);
       } catch (err) {
         toast.error("Failed to save slot: " + err.message);
@@ -138,6 +145,9 @@ export function HighlightsPage() {
       }
     } else {
       setTimeout(() => {
+        setHighlights((prev) =>
+          prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
+        );
         setSavingSlot(null);
         toast.success(`Slot #${slotNumber} saved.`);
       }, 300);
@@ -146,7 +156,7 @@ export function HighlightsPage() {
 
   const handleUpdateText = (slotNumber, field, value) => {
     setHighlights((prev) =>
-      prev.map((h) => (h.slotNumber === slotNumber ? { ...h, [field]: value } : h))
+      prev.map((h) => (h.slotNumber === slotNumber ? { ...h, [field]: value, isDirty: true } : h))
     );
   };
 
@@ -170,19 +180,16 @@ export function HighlightsPage() {
       const updatedSlot = {
         ...target,
         imageUrl: dataUrl,
+        isDirty: true,
         updatedAt: new Date().toISOString(),
       };
 
+      // Only update local state for preview — DO NOT save to Firestore until "Save Banner Changes" is clicked
       setHighlights((prev) =>
         prev.map((h) => (h.slotNumber === slotNumber ? updatedSlot : h))
       );
 
-      // Persist immediately to Firestore so other slots and live listeners stay intact
-      if (isFirebaseConfigured) {
-        await saveHighlightSlot(slotNumber, updatedSlot);
-      }
-
-      toast.success(`Banner image saved for Slot #${slotNumber}!`);
+      toast.info(`Image attached for Slot #${slotNumber}. Click "Save Banner Changes" below to save.`);
     } catch (err) {
       console.error("Banner processing error:", err);
       toast.error("Failed to process image: " + err.message);
@@ -191,19 +198,11 @@ export function HighlightsPage() {
     }
   };
 
-  const handleRemoveImage = async (slotNumber) => {
-    const cleared = { slotNumber, imageUrl: "", title: "", subtitle: "", isActive: false };
+  const handleRemoveImage = (slotNumber) => {
     setHighlights((prev) =>
-      prev.map((h) => (h.slotNumber === slotNumber ? cleared : h))
+      prev.map((h) => (h.slotNumber === slotNumber ? { ...h, imageUrl: "", isDirty: true } : h))
     );
-    if (isFirebaseConfigured) {
-      try {
-        await saveHighlightSlot(slotNumber, cleared);
-      } catch (err) {
-        console.warn("Remove image error:", err);
-      }
-    }
-    toast.info(`Slot #${slotNumber} cleared.`);
+    toast.info(`Image cleared for Slot #${slotNumber}. Click "Save Banner Changes" to save.`);
   };
 
   return (
@@ -345,13 +344,23 @@ export function HighlightsPage() {
               <div className="pt-2">
                 <Button
                   size="default"
-                  variant="outline"
+                  variant={slot.isDirty ? "default" : "outline"}
                   disabled={savingSlot === slot.slotNumber}
                   onClick={() => handleSaveSlot(slot.slotNumber)}
-                  className="h-9 text-xs font-bold px-3 gap-2 rounded-xl hover:border-primary hover:text-primary cursor-pointer w-full justify-center transition-colors shadow-2xs"
+                  className={`h-9 text-xs font-bold px-3 gap-2 rounded-xl cursor-pointer w-full justify-center transition-all shadow-2xs ${
+                    slot.isDirty
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                      : "hover:border-primary hover:text-primary"
+                  }`}
                 >
                   <Save className="size-3.5" />
-                  <span>{savingSlot === slot.slotNumber ? "Saving Slot..." : "Save Banner Changes"}</span>
+                  <span>
+                    {savingSlot === slot.slotNumber
+                      ? "Saving Slot..."
+                      : slot.isDirty
+                      ? "Save Changes *"
+                      : "Save Banner Changes"}
+                  </span>
                 </Button>
               </div>
             </CardContent>
