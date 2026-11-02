@@ -194,6 +194,52 @@ export function ChefManagementPage() {
     });
   }, [societiesList, selectedCity, selectedArea]);
 
+  // Delivering Society dropdown options derived strictly from activeDeliverableSocieties
+  // of the chefs matching the selected City, Area, and Base Society filters
+  const availableDeliveringSocieties = useMemo(() => {
+    const matchingChefs = chefs.filter((c) => {
+      const cAddr = String(c.address || "").toLowerCase();
+      const chefSocietyNames = Array.from(
+        new Set([...(c.assignedSocieties || []), c.baseSociety].filter(Boolean))
+      );
+      const matchedSocs = societiesList.filter(
+        (s) => chefSocietyNames.includes(s.name) || chefSocietyNames.includes(s.id)
+      );
+
+      const matchesCity =
+        selectedCity === "all" ||
+        matchedSocs.some((s) => String(s.city || "").toLowerCase() === selectedCity.toLowerCase()) ||
+        cAddr.includes(selectedCity.toLowerCase());
+
+      const matchesArea =
+        selectedArea === "all" ||
+        matchedSocs.some((s) => String(s.area || "").toLowerCase() === selectedArea.toLowerCase()) ||
+        cAddr.includes(selectedArea.toLowerCase());
+
+      const matchesBaseSociety =
+        selectedBaseSociety === "all" ||
+        String(c.baseSociety || "").toLowerCase() === selectedBaseSociety.toLowerCase();
+
+      return matchesCity && matchesArea && matchesBaseSociety;
+    });
+
+    const societySet = new Set();
+    matchingChefs.forEach((c) => {
+      const activeList = Array.isArray(c.activeDeliverableSocieties) ? c.activeDeliverableSocieties : [];
+      activeList.forEach((item) => {
+        if (!item || typeof item !== "string") return;
+        const matchedSoc = societiesList.find((s) => s.id === item || s.name === item);
+        if (matchedSoc && matchedSoc.name) {
+          societySet.add(matchedSoc.name);
+        } else if (!item.toLowerCase().startsWith("soc_")) {
+          societySet.add(item);
+        }
+      });
+    });
+
+    return Array.from(societySet).sort((a, b) => a.localeCompare(b));
+  }, [chefs, societiesList, selectedCity, selectedArea, selectedBaseSociety]);
+
   const activeFilterCount =
     (selectedCity !== "all" ? 1 : 0) +
     (selectedArea !== "all" ? 1 : 0) +
@@ -1118,9 +1164,9 @@ export function ChefManagementPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Delivering Societies</SelectItem>
-                      {availableSocieties.map((soc, idx) => (
-                        <SelectItem key={`filter-deliv-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
-                          {toTitleCase(soc.name)}
+                      {availableDeliveringSocieties.map((socName, idx) => (
+                        <SelectItem key={`filter-deliv-soc-${socName}-${idx}`} value={socName}>
+                          {toTitleCase(socName)}
                         </SelectItem>
                       ))}
                     </SelectContent>
