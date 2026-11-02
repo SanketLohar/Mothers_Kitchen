@@ -195,26 +195,29 @@ export function ChefManagementPage() {
   }, [societiesList, selectedCity, selectedArea]);
 
   // Delivering Society dropdown options derived strictly from activeDeliverableSocieties
-  // of the chefs matching the selected City, Area, and Base Society filters
+  // of the chefs matching the selected City, Area, and Base Society filters (based on chef's home location)
   const availableDeliveringSocieties = useMemo(() => {
     const matchingChefs = chefs.filter((c) => {
+      const baseSoc = societiesList.find(
+        (s) =>
+          (s.name && (c.baseSociety || "").toLowerCase() === s.name.toLowerCase()) ||
+          (s.id && c.baseSociety === s.id)
+      );
+      const chefCity = (c.city || baseSoc?.city || "").toLowerCase();
+      const chefArea = (c.area || baseSoc?.area || "").toLowerCase();
       const cAddr = String(c.address || "").toLowerCase();
-      const chefSocietyNames = Array.from(
-        new Set([...(c.assignedSocieties || []), c.baseSociety].filter(Boolean))
-      );
-      const matchedSocs = societiesList.filter(
-        (s) => chefSocietyNames.includes(s.name) || chefSocietyNames.includes(s.id)
-      );
 
+      const targetCity = selectedCity.toLowerCase();
       const matchesCity =
         selectedCity === "all" ||
-        matchedSocs.some((s) => String(s.city || "").toLowerCase() === selectedCity.toLowerCase()) ||
-        cAddr.includes(selectedCity.toLowerCase());
+        chefCity === targetCity ||
+        (!chefCity && cAddr.includes(targetCity));
 
+      const targetArea = selectedArea.toLowerCase();
       const matchesArea =
         selectedArea === "all" ||
-        matchedSocs.some((s) => String(s.area || "").toLowerCase() === selectedArea.toLowerCase()) ||
-        cAddr.includes(selectedArea.toLowerCase());
+        chefArea === targetArea ||
+        (!chefArea && cAddr.includes(targetArea));
 
       const matchesBaseSociety =
         selectedBaseSociety === "all" ||
@@ -937,27 +940,26 @@ export function ChefManagementPage() {
         (statusFilter === "enabled" && !c.isDeactivatedByAdmin) ||
         (statusFilter === "disabled" && c.isDeactivatedByAdmin);
 
-      // Get all society names linked to this chef
-      const chefSocietyNames = Array.from(
-        new Set([...(c.assignedSocieties || []), c.baseSociety].filter(Boolean))
+      // Check City & Area match (strictly based on chef's home location / baseSociety)
+      const baseSoc = societiesList.find(
+        (s) =>
+          (s.name && (c.baseSociety || "").toLowerCase() === s.name.toLowerCase()) ||
+          (s.id && c.baseSociety === s.id)
       );
+      const chefCity = (c.city || baseSoc?.city || "").toLowerCase();
+      const chefArea = (c.area || baseSoc?.area || "").toLowerCase();
 
-      // Find society objects from societiesList for city and area checks
-      const matchedSocs = societiesList.filter(
-        (s) => chefSocietyNames.includes(s.name) || chefSocietyNames.includes(s.id)
-      );
-
-      // Check City match
+      const targetCity = selectedCity.toLowerCase();
       const matchesCity =
         selectedCity === "all" ||
-        matchedSocs.some((s) => String(s.city || "").toLowerCase() === selectedCity.toLowerCase()) ||
-        cAddr.includes(selectedCity.toLowerCase());
+        chefCity === targetCity ||
+        (!chefCity && cAddr.includes(targetCity));
 
-      // Check Area match
+      const targetArea = selectedArea.toLowerCase();
       const matchesArea =
         selectedArea === "all" ||
-        matchedSocs.some((s) => String(s.area || "").toLowerCase() === selectedArea.toLowerCase()) ||
-        cAddr.includes(selectedArea.toLowerCase());
+        chefArea === targetArea ||
+        (!chefArea && cAddr.includes(targetArea));
 
       // Check Base Society match
       const matchesBaseSociety =
