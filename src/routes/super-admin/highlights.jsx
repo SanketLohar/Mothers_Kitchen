@@ -53,29 +53,73 @@ export function HighlightsPage() {
   useEffect(() => {
     const unsub = subscribeToHighlights((list) => {
       if (list && list.length) {
-        setHighlights(list);
+        setHighlights((prev) => {
+          return list.map((remote) => {
+            const local = prev.find((p) => p.slotNumber === remote.slotNumber);
+            return {
+              ...remote,
+              // If remote is empty but local has pending image/text, preserve local
+              imageUrl: remote.imageUrl || local?.imageUrl || "",
+              title: remote.title || local?.title || "",
+              subtitle: remote.subtitle || local?.subtitle || "",
+            };
+          });
+        });
       }
     });
     return () => unsub();
   }, []);
 
+  // Compresses banner to high-quality persistent data URL (JPEG max 1080x540 ~50KB)
+  const compressBanner = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = reject;
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onerror = reject;
+        img.onload = () => {
+          const maxW = 1080;
+          const maxH = 540;
+          let w = img.width;
+          let h = img.height;
+          if (w > maxW || h > maxH) {
+            const ratio = Math.min(maxW / w, maxH / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = w;
+          canvas.height = h;
+          const ctx = canvas.getContext("2d");
+          ctx.drawImage(img, 0, 0, w, h);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.src = e.target.result;
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleToggleActive = async (slotNumber) => {
     const target = highlights.find((h) => h.slotNumber === slotNumber);
-    const next = !target?.isActive;
+    if (!target) return;
+    const next = !target.isActive;
+    const updated = { ...target, isActive: next };
 
     setHighlights((prev) =>
-      prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isActive: next } : h))
+      prev.map((h) => (h.slotNumber === slotNumber ? updated : h))
     );
 
-    if (isFirebaseConfigured && target) {
+    if (isFirebaseConfigured) {
       try {
-        await saveHighlightSlot(slotNumber, { ...target, isActive: next });
+        await saveHighlightSlot(slotNumber, updated);
       } catch (err) {
         console.error("Highlight toggle error:", err);
       }
     }
 
-    toast.success(`Highlight Slot ${slotNumber} is now ${next ? "ACTIVE" : "INACTIVE"} on Customer App.`);
+    toast.success(`Highlight Slot #${slotNumber} is now ${next ? "ACTIVE" : "INACTIVE"} on Customer App.`);
   };
 
   const handleSaveSlot = async (slotNumber) => {
@@ -86,7 +130,7 @@ export function HighlightsPage() {
     if (isFirebaseConfigured) {
       try {
         await saveHighlightSlot(slotNumber, target);
-        toast.success(`Slot ${slotNumber} successfully saved to Firestore!`);
+        toast.success(`Slot #${slotNumber} successfully saved to Firestore!`);
       } catch (err) {
         toast.error("Failed to save slot: " + err.message);
       } finally {
@@ -95,7 +139,7 @@ export function HighlightsPage() {
     } else {
       setTimeout(() => {
         setSavingSlot(null);
-        toast.success(`Slot ${slotNumber} saved.`);
+        toast.success(`Slot #${slotNumber} saved.`);
       }, 300);
     }
   };
@@ -106,7 +150,7 @@ export function HighlightsPage() {
     );
   };
 
-  const handleImageFileSelect = (slotNumber, e) => {
+  const handleImageFileSelect = async (slotNumber, e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -115,29 +159,51 @@ export function HighlightsPage() {
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Image file size exceeds the maximum limit of 5 MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Image file size exceeds the maximum limit of 10 MB.");
       return;
     }
 
-    const objectUrl = URL.createObjectURL(file);
-    setHighlights((prev) =>
-      prev.map((h) =>
-        h.slotNumber === slotNumber ? { ...h, imageUrl: objectUrl, updatedAt: new Date().toISOString() } : h
-      )
-    );
-    toast.success(`Image selected for Slot ${slotNumber}. (Ready for Firebase Storage upload)`);
+    try {
+      const dataUrl = await compressBanner(file);
+      const target = highlights.find((h) => h.slotNumber === slotNumber) || { slotNumber };
+      const updatedSlot = {
+        ...target,
+        imageUrl: dataUrl,
+        updatedAt: new Date().toISOString(),
+      };
+
+      setHighlights((prev) =>
+        prev.map((h) => (h.slotNumber === slotNumber ? updatedSlot : h))
+      );
+
+      // Persist immediately to Firestore so other slots and live listeners stay intact
+      if (isFirebaseConfigured) {
+        await saveHighlightSlot(slotNumber, updatedSlot);
+      }
+
+      toast.success(`Banner image saved for Slot #${slotNumber}!`);
+    } catch (err) {
+      console.error("Banner processing error:", err);
+      toast.error("Failed to process image: " + err.message);
+    } finally {
+      e.target.value = "";
+    }
   };
 
-  const handleRemoveImage = (slotNumber) => {
+  const handleRemoveImage = async (slotNumber) => {
+    const cleared = { slotNumber, imageUrl: "", title: "", subtitle: "", isActive: false };
     setHighlights((prev) =>
-      prev.map((h) =>
-        h.slotNumber === slotNumber
-          ? { ...h, imageUrl: "", title: "", subtitle: "", isActive: false }
-          : h
-      )
+      prev.map((h) => (h.slotNumber === slotNumber ? cleared : h))
     );
-    toast.info(`Slot ${slotNumber} cleared.`);
+    if (isFirebaseConfigured) {
+      try {
+        await saveHighlightSlot(slotNumber, cleared);
+      } catch (err) {
+        console.warn("Remove image error:", err);
+      }
+    }
+    toast.info(`Slot #${slotNumber} cleared.`);
   };
 
   return (
@@ -200,8 +266,8 @@ export function HighlightsPage() {
             </CardHeader>
 
             <CardContent className="p-4 sm:p-5 space-y-4 flex-1 flex flex-col justify-between">
-              {/* Image Preview Box — Spacious & High Visibility */}
-              <div className="relative h-44 sm:h-48 w-full rounded-xl overflow-hidden border border-border bg-muted flex items-center justify-center group shrink-0 shadow-inner">
+              {/* Image Preview Box — 2:1 Aspect Ratio (1080 x 540) to fit 100% perfectly without clipping */}
+              <div className="relative aspect-[2/1] w-full rounded-xl overflow-hidden border border-border bg-muted/60 flex items-center justify-center group shrink-0 shadow-inner">
                 {slot.imageUrl ? (
                   <>
                     <img

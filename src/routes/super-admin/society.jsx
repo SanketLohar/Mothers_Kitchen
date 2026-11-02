@@ -19,6 +19,7 @@ import {
   FileSpreadsheet,
   Minus,
   ChevronDown,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -464,6 +465,21 @@ export function SocietyManagementPage() {
     });
   }, [societies, searchQuery, selectedCity, selectedArea, statusFilter]);
 
+  // Pagination (10 rows per page)
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
+  const totalSocieties = filteredSocieties.length;
+  const totalPages = Math.ceil(totalSocieties / pageSize) || 1;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedCity, selectedArea, statusFilter]);
+
+  const paginatedSocieties = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredSocieties.slice(start, start + pageSize);
+  }, [filteredSocieties, currentPage, pageSize]);
+
   // Export to Excel
   const handleExportExcel = () => {
     if (!filteredSocieties.length) {
@@ -509,15 +525,25 @@ export function SocietyManagementPage() {
       {/* Search and Filters Bar (Laundrysta Style) */}
       <Card className="border-border">
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* Search Box */}
+          {/* Search Box with Clear Button */}
           <div className="relative flex-1 w-full">
-            <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <Input
               placeholder="Search by society name, area or city..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 w-full rounded-xl bg-card border-border"
+              className="pl-9 pr-9 h-10 w-full rounded-xl bg-card border-border"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors cursor-pointer"
+                title="Clear text"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Action Buttons: Filter Popover + Export Excel */}
@@ -689,17 +715,17 @@ export function SocietyManagementPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredSocieties.length === 0 ? (
+            {paginatedSocieties.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} className="h-32 text-center text-muted-foreground">
                   No societies match your search criteria.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredSocieties.map((soc, idx) => (
+              paginatedSocieties.map((soc, idx) => (
                 <TableRow key={soc.id} className={soc.status === "disabled" ? "bg-rose-50/30" : ""}>
                   <TableCell className="text-center font-bold text-muted-foreground">
-                    {idx + 1}
+                    {(currentPage - 1) * pageSize + idx + 1}
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -768,6 +794,53 @@ export function SocietyManagementPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination Bar (10 rows per page) */}
+        <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <div>
+            Showing{" "}
+            <span className="font-bold text-foreground">
+              {totalSocieties === 0 ? 0 : (currentPage - 1) * pageSize + 1}-
+              {Math.min(currentPage * pageSize, totalSocieties)}
+            </span>{" "}
+            out of <span className="font-bold text-foreground">{totalSocieties}</span> {totalSocieties === 1 ? "result" : "results"}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="h-8 px-2.5 rounded-lg cursor-pointer"
+              >
+                Previous
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`size-8 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    currentPage === page
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border hover:bg-muted text-foreground"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="h-8 px-2.5 rounded-lg cursor-pointer"
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Add / Edit Society Modal (BRD p. 18 Layout) */}

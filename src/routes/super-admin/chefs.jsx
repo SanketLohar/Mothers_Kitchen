@@ -24,6 +24,7 @@ import {
   Filter,
   ZoomIn,
   ExternalLink,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -126,6 +127,22 @@ function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs", on
   );
 }
 
+/**
+ * Formats complete chef address in format: Flat no, Floor number, Wing name, Society Name, Area, City
+ */
+function formatChefAddress(chef) {
+  if (!chef) return "—";
+  const parts = [];
+  if (chef.flatNumber) parts.push(`Flat ${chef.flatNumber}`);
+  if (chef.floor) parts.push(`Floor ${chef.floor}`);
+  if (chef.wing) parts.push(`Wing ${toTitleCase(chef.wing)}`);
+  if (chef.baseSociety) parts.push(toTitleCase(chef.baseSociety));
+  if (chef.area) parts.push(toTitleCase(chef.area));
+  if (chef.city) parts.push(toTitleCase(chef.city));
+  if (parts.length >= 2) return parts.join(", ");
+  return chef.address || "—";
+}
+
 export function ChefManagementPage() {
   const [chefs, setChefs] = useState([]);
   const [societiesList, setSocietiesList] = useState([]);
@@ -133,7 +150,10 @@ export function ChefManagementPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [selectedCity, setSelectedCity] = useState("all");
   const [selectedArea, setSelectedArea] = useState("all");
-  const [selectedSociety, setSelectedSociety] = useState("all");
+  const [selectedBaseSociety, setSelectedBaseSociety] = useState("all");
+  const [selectedDeliveringSociety, setSelectedDeliveringSociety] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 10;
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -177,7 +197,8 @@ export function ChefManagementPage() {
   const activeFilterCount =
     (selectedCity !== "all" ? 1 : 0) +
     (selectedArea !== "all" ? 1 : 0) +
-    (selectedSociety !== "all" ? 1 : 0) +
+    (selectedBaseSociety !== "all" ? 1 : 0) +
+    (selectedDeliveringSociety !== "all" ? 1 : 0) +
     (statusFilter !== "all" ? 1 : 0);
 
   // Modal States
@@ -892,14 +913,35 @@ export function ChefManagementPage() {
         matchedSocs.some((s) => String(s.area || "").toLowerCase() === selectedArea.toLowerCase()) ||
         cAddr.includes(selectedArea.toLowerCase());
 
-      // Check Society match
-      const matchesSociety =
-        selectedSociety === "all" ||
-        chefSocietyNames.some((sn) => sn.toLowerCase() === selectedSociety.toLowerCase());
+      // Check Base Society match
+      const matchesBaseSociety =
+        selectedBaseSociety === "all" ||
+        String(c.baseSociety || "").toLowerCase() === selectedBaseSociety.toLowerCase();
 
-      return matchesSearch && matchesStatus && matchesCity && matchesArea && matchesSociety;
+      // Check Delivering Society match (from assignedSocieties or activeDeliverableSocieties)
+      const deliveringSocieties = Array.from(
+        new Set([...(c.assignedSocieties || []), ...(c.activeDeliverableSocieties || [])].filter(Boolean))
+      );
+      const matchesDeliveringSociety =
+        selectedDeliveringSociety === "all" ||
+        deliveringSocieties.some((ds) => String(ds).toLowerCase() === selectedDeliveringSociety.toLowerCase());
+
+      return matchesSearch && matchesStatus && matchesCity && matchesArea && matchesBaseSociety && matchesDeliveringSociety;
     });
-  }, [chefs, searchQuery, statusFilter, selectedCity, selectedArea, selectedSociety, societiesList]);
+  }, [chefs, searchQuery, statusFilter, selectedCity, selectedArea, selectedBaseSociety, selectedDeliveringSociety, societiesList]);
+
+  // Pagination (10 rows per page)
+  const totalChefs = filteredChefs.length;
+  const totalPages = Math.ceil(totalChefs / pageSize) || 1;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter, selectedCity, selectedArea, selectedBaseSociety, selectedDeliveringSociety]);
+
+  const paginatedChefs = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredChefs.slice(start, start + pageSize);
+  }, [filteredChefs, currentPage, pageSize]);
 
   return (
     <Shell
@@ -915,15 +957,25 @@ export function ChefManagementPage() {
       {/* Search and Filters Bar (Laundrysta Style) */}
       <Card className="border-border">
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-          {/* Search Box */}
+          {/* Search Box with Clear Button */}
           <div className="relative flex-1 w-full">
-            <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+            <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <Input
               placeholder="Search By Phone, Name Or Email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-10 w-full rounded-xl bg-card border-border"
+              className="pl-9 pr-9 h-10 w-full rounded-xl bg-card border-border"
             />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors cursor-pointer"
+                title="Clear text"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
           </div>
 
           {/* Action Buttons: Filter Popover + Export Excel */}
@@ -959,7 +1011,8 @@ export function ChefManagementPage() {
                       onClick={() => {
                         setSelectedCity("all");
                         setSelectedArea("all");
-                        setSelectedSociety("all");
+                        setSelectedBaseSociety("all");
+                        setSelectedDeliveringSociety("all");
                         setStatusFilter("all");
                       }}
                       className="text-xs text-primary font-semibold hover:underline cursor-pointer"
@@ -979,7 +1032,8 @@ export function ChefManagementPage() {
                     onValueChange={(val) => {
                       setSelectedCity(val);
                       setSelectedArea("all");
-                      setSelectedSociety("all");
+                      setSelectedBaseSociety("all");
+                      setSelectedDeliveringSociety("all");
                     }}
                   >
                     <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
@@ -1005,7 +1059,8 @@ export function ChefManagementPage() {
                     value={selectedArea}
                     onValueChange={(val) => {
                       setSelectedArea(val);
-                      setSelectedSociety("all");
+                      setSelectedBaseSociety("all");
+                      setSelectedDeliveringSociety("all");
                     }}
                   >
                     <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
@@ -1022,22 +1077,45 @@ export function ChefManagementPage() {
                   </Select>
                 </div>
 
-                {/* Society Dropdown (Cascading from Area & City) */}
+                {/* 1. Base Society Name Dropdown */}
                 <div className="space-y-1.5">
                   <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Society Name
+                    Base Society Name
                   </Label>
                   <Select
-                    value={selectedSociety}
-                    onValueChange={(val) => setSelectedSociety(val)}
+                    value={selectedBaseSociety}
+                    onValueChange={(val) => setSelectedBaseSociety(val)}
                   >
                     <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
-                      <SelectValue placeholder="All Societies" />
+                      <SelectValue placeholder="All Base Societies" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">All Societies</SelectItem>
+                      <SelectItem value="all">All Base Societies</SelectItem>
                       {availableSocieties.map((soc, idx) => (
-                        <SelectItem key={`filter-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
+                        <SelectItem key={`filter-base-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
+                          {toTitleCase(soc.name)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* 2. Delivering Society Name Dropdown */}
+                <div className="space-y-1.5">
+                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Delivering Society Name
+                  </Label>
+                  <Select
+                    value={selectedDeliveringSociety}
+                    onValueChange={(val) => setSelectedDeliveringSociety(val)}
+                  >
+                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                      <SelectValue placeholder="All Delivering Societies" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Delivering Societies</SelectItem>
+                      {availableSocieties.map((soc, idx) => (
+                        <SelectItem key={`filter-deliv-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
                           {toTitleCase(soc.name)}
                         </SelectItem>
                       ))}
@@ -1100,22 +1178,22 @@ export function ChefManagementPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-12 text-center">#</TableHead>
-              <TableHead>Chef</TableHead>
-              <TableHead>Mobile Number</TableHead>
-              <TableHead>Address</TableHead>
-              <TableHead className="w-28 text-right">Actions</TableHead>
+              <TableHead className="w-16 text-center font-bold">Sr.No</TableHead>
+              <TableHead className="text-center font-bold">Name</TableHead>
+              <TableHead className="text-center font-bold">Contact Details</TableHead>
+              <TableHead className="text-center font-bold">Address</TableHead>
+              <TableHead className="w-32 text-center font-bold">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredChefs.length === 0 ? (
+            {paginatedChefs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
                   No chefs match your search criteria.
                 </TableCell>
               </TableRow>
             ) : (
-              filteredChefs.map((chef, idx) => (
+              paginatedChefs.map((chef, idx) => (
                 <TableRow
                   key={chef.id}
                   className={`cursor-pointer transition-colors hover:bg-muted/60 ${
@@ -1124,10 +1202,10 @@ export function ChefManagementPage() {
                   onClick={() => setViewingChef(chef)}
                 >
                   <TableCell className="text-center font-bold text-muted-foreground">
-                    {idx + 1}
+                    {(currentPage - 1) * pageSize + idx + 1}
                   </TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3 group/chef">
+                  <TableCell className="text-center">
+                    <div className="flex flex-col items-center justify-center gap-1.5 group/chef">
                       <div
                         className="relative shrink-0 transition-transform group-hover/chef:scale-105 cursor-pointer"
                         onClick={(e) => {
@@ -1161,8 +1239,8 @@ export function ChefManagementPage() {
                           }
                         />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="flex flex-col items-center text-center">
+                        <div className="flex items-center justify-center gap-1.5">
                           <span className="font-bold text-foreground group-hover/chef:text-primary group-hover/chef:underline underline-offset-2 transition-colors">
                             {toTitleCase(chef.fullName)}
                           </span>
@@ -1176,7 +1254,7 @@ export function ChefManagementPage() {
                           )}
                         </div>
                         {/* Active on App Pill directly below Chef Name */}
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center justify-center gap-2 mt-1">
                           {chef.isActive ? (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-300 text-emerald-800 text-[10px] font-bold shadow-2xs">
                               <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -1189,47 +1267,51 @@ export function ChefManagementPage() {
                             </span>
                           )}
                         </div>
-                        <div className="text-[11px] text-muted-foreground flex items-center gap-1 mt-1">
+                        <div className="text-[11px] text-muted-foreground flex items-center justify-center gap-1 mt-1">
                           <MapPin className="size-3" />
-                          {toTitleCase(chef.baseSociety) || "No base society"}
+                          <span>{toTitleCase(chef.baseSociety) || "No base society"}</span>
                         </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="font-medium text-foreground flex items-center gap-1.5">
-                      <Phone className="size-3 text-muted-foreground" />
-                      <span>{chef.mobileNumber}</span>
-                    </div>
-                    <div className="text-[11px] text-muted-foreground truncate max-w-[150px]">
-                      {chef.authEmail || chef.email || "No email"}
-                    </div>
-                    {(chef.defaultPassword || chef.password) && (
-                      <div className="flex items-center gap-1.5 mt-1">
-                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                          PW: {chef.defaultPassword || chef.password}
-                        </span>
-                        <button
-                          type="button"
-                          title="Copy Mobile & Password"
-                          className="text-muted-foreground hover:text-primary transition-colors p-0.5"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const cred = `Chef Login:\nMobile: ${chef.mobileNumber}\nPassword: ${chef.defaultPassword || chef.password}`;
-                            navigator.clipboard.writeText(cred);
-                            toast.success("Credentials copied for WhatsApp!");
-                          }}
-                        >
-                          <Copy className="size-3" />
-                        </button>
+                  <TableCell className="text-center">
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="font-medium text-foreground flex items-center justify-center gap-1.5">
+                        <Phone className="size-3 text-muted-foreground" />
+                        <span>{chef.mobileNumber}</span>
                       </div>
-                    )}
+                      <div className="text-[11px] text-muted-foreground truncate max-w-[180px]">
+                        {chef.authEmail || chef.email || "No email"}
+                      </div>
+                      {(chef.defaultPassword || chef.password) && (
+                        <div className="flex items-center justify-center gap-1.5 mt-1">
+                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
+                            PW: {chef.defaultPassword || chef.password}
+                          </span>
+                          <button
+                            type="button"
+                            title="Copy Mobile & Password"
+                            className="text-muted-foreground hover:text-primary transition-colors p-0.5"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const cred = `Chef Login:\nMobile: ${chef.mobileNumber}\nPassword: ${chef.defaultPassword || chef.password}`;
+                              navigator.clipboard.writeText(cred);
+                              toast.success("Credentials copied for WhatsApp!");
+                            }}
+                          >
+                            <Copy className="size-3" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
-                  <TableCell className="max-w-xs text-xs text-muted-foreground truncate" title={chef.address}>
-                    {chef.address || "—"}
+                  <TableCell className="text-center text-xs text-foreground font-medium max-w-sm">
+                    <span className="leading-relaxed block">
+                      {formatChefAddress(chef)}
+                    </span>
                   </TableCell>
-                  <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-end gap-1">
+                  <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                    <div className="flex items-center justify-center gap-1">
                       <Button
                         variant="ghost"
                         size="icon"
@@ -1275,6 +1357,53 @@ export function ChefManagementPage() {
             )}
           </TableBody>
         </Table>
+
+        {/* Pagination Bar (10 rows per page) */}
+        <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <div>
+            Showing{" "}
+            <span className="font-bold text-foreground">
+              {totalChefs === 0 ? 0 : (currentPage - 1) * pageSize + 1}-
+              {Math.min(currentPage * pageSize, totalChefs)}
+            </span>{" "}
+            out of <span className="font-bold text-foreground">{totalChefs}</span> {totalChefs === 1 ? "result" : "results"}
+          </div>
+          {totalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="h-8 px-2.5 rounded-lg cursor-pointer"
+              >
+                Previous
+              </Button>
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`size-8 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+                    currentPage === page
+                      ? "bg-primary text-primary-foreground"
+                      : "border border-border hover:bg-muted text-foreground"
+                  }`}
+                >
+                  {page}
+                </button>
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="h-8 px-2.5 rounded-lg cursor-pointer"
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </div>
       </Card>
 
       {/* Add / Edit Chef Modal (BRD p. 20) */}
@@ -2032,14 +2161,8 @@ export function ChefManagementPage() {
               </div>
             )}
             <div className="flex justify-between border-b pb-2">
-              <span className="text-muted-foreground">Location (City / Area):</span>
-              <span className="font-semibold">
-                {toTitleCase(activeViewingChef?.city || "")}{activeViewingChef?.area ? ` / ${toTitleCase(activeViewingChef?.area)}` : ""}
-              </span>
-            </div>
-            <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Complete Address:</span>
-              <span className="text-xs text-right max-w-xs">{activeViewingChef?.address}</span>
+              <span className="text-xs text-right max-w-xs font-medium">{formatChefAddress(activeViewingChef)}</span>
             </div>
             <div className="space-y-1 pt-1">
               <div className="flex items-center justify-between">

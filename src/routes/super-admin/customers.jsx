@@ -60,7 +60,7 @@ export function CustomersPage() {
   const [selectedSociety, setSelectedSociety] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [viewingCustomer, setViewingCustomer] = useState(null);
-  const pageSize = 8;
+  const pageSize = 10;
 
   useEffect(() => {
     const unsubCust = subscribeToCustomers((list) => {
@@ -251,13 +251,23 @@ export function CustomersPage() {
           {/* Search Box & Actions (Reset + Export Excel) */}
           <div className="flex flex-col sm:flex-row items-center gap-3 pt-1">
             <div className="relative flex-1 w-full">
-              <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+              <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <Input
                 placeholder="Search by customer name, mobile number or address..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-                className="pl-9 h-10 w-full rounded-xl bg-card border-border"
+                className="pl-9 pr-9 h-10 w-full rounded-xl bg-card border-border"
               />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => { setSearchQuery(""); setCurrentPage(1); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground rounded-full hover:bg-muted transition-colors cursor-pointer"
+                  title="Clear text"
+                >
+                  <X className="size-3.5" />
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end">
               <Button
@@ -341,9 +351,12 @@ export function CustomersPage() {
         {/* Pagination Bar (BRD p. 22) */}
         <div className="p-4 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
           <div>
-            Showing <span className="font-bold text-foreground">{paginatedCustomers.length ? (currentPage - 1) * pageSize + 1 : 0}</span> to{" "}
-            <span className="font-bold text-foreground">{Math.min(currentPage * pageSize, totalItems)}</span> of{" "}
-            <span className="font-bold text-foreground">{totalItems}</span> filtered customers
+            Showing{" "}
+            <span className="font-bold text-foreground">
+              {totalItems === 0 ? 0 : (currentPage - 1) * pageSize + 1}-
+              {Math.min(currentPage * pageSize, totalItems)}
+            </span>{" "}
+            out of <span className="font-bold text-foreground">{totalItems}</span> {totalItems === 1 ? "result" : "results"}
           </div>
           <div className="flex items-center gap-1">
             <Button
