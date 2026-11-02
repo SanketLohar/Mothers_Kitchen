@@ -123,24 +123,45 @@ export function StatisticsReportsPage() {
     };
   }, [stats, periodMultiplier]);
 
-  // Distinct options across societies and chefs
+  // Distinct cities across societies and chefs
   const allCities = useMemo(() => {
     const fromSocs = societies.map((s) => s.city).filter(Boolean);
     const fromChefs = chefs.map((c) => c.city).filter(Boolean);
     return Array.from(new Set([...fromSocs, ...fromChefs])).sort();
   }, [societies, chefs]);
 
-  const allAreas = useMemo(() => {
-    const fromSocs = societies.map((s) => s.area).filter(Boolean);
-    const fromChefs = chefs.map((c) => c.area).filter(Boolean);
-    return Array.from(new Set([...fromSocs, ...fromChefs])).sort();
-  }, [societies, chefs]);
+  // Dependent available areas for Report 1 (filtered by chefCustCity)
+  const chefCustAvailableAreas = useMemo(() => {
+    const list = chefCustCity === "all"
+      ? societies
+      : societies.filter((s) => String(s.city || "").toLowerCase() === chefCustCity.toLowerCase());
+    return Array.from(new Set(list.map((s) => s.area).filter(Boolean))).sort();
+  }, [societies, chefCustCity]);
 
-  const allSocieties = useMemo(() => {
-    const fromSocs = societies.map((s) => s.name).filter(Boolean);
-    const fromChefs = chefs.map((c) => c.baseSociety).filter(Boolean);
-    return Array.from(new Set([...fromSocs, ...fromChefs])).sort();
-  }, [societies, chefs]);
+  // Dependent available areas for Report 2 (filtered by ordersCity)
+  const ordersAvailableAreas = useMemo(() => {
+    const list = ordersCity === "all"
+      ? societies
+      : societies.filter((s) => String(s.city || "").toLowerCase() === ordersCity.toLowerCase());
+    return Array.from(new Set(list.map((s) => s.area).filter(Boolean))).sort();
+  }, [societies, ordersCity]);
+
+  // Dependent available areas and societies for Report 3 (filtered by chefPerfCity / chefPerfArea)
+  const chefPerfAvailableAreas = useMemo(() => {
+    const list = chefPerfCity === "all"
+      ? societies
+      : societies.filter((s) => String(s.city || "").toLowerCase() === chefPerfCity.toLowerCase());
+    return Array.from(new Set(list.map((s) => s.area).filter(Boolean))).sort();
+  }, [societies, chefPerfCity]);
+
+  const chefPerfAvailableSocieties = useMemo(() => {
+    const list = societies.filter((s) => {
+      const matchCity = chefPerfCity === "all" || String(s.city || "").toLowerCase() === chefPerfCity.toLowerCase();
+      const matchArea = chefPerfArea === "all" || String(s.area || "").toLowerCase() === chefPerfArea.toLowerCase();
+      return matchCity && matchArea;
+    });
+    return Array.from(new Set(list.map((s) => s.name).filter(Boolean))).sort();
+  }, [societies, chefPerfCity, chefPerfArea]);
 
   // 1. Filtered data for Report 1: Chef / Customer Count per Society
   const filteredChefCustomerSocieties = useMemo(() => {
@@ -163,48 +184,107 @@ export function StatisticsReportsPage() {
   // 3. Filtered data for Report 3: Chef Performance
   const filteredChefPerformance = useMemo(() => {
     return chefs.filter((c) => {
-      // Find linked society info
-      const chefSocNames = Array.from(new Set([...(c.assignedSocieties || []), c.baseSociety].filter(Boolean)));
-      const linkedSocs = societies.filter((s) => chefSocNames.includes(s.name) || chefSocNames.includes(s.id));
+      const baseSoc = societies.find(
+        (s) =>
+          (s.name && (c.baseSociety || "").toLowerCase() === s.name.toLowerCase()) ||
+          (s.id && c.baseSociety === s.id)
+      );
+      const chefCity = (c.city || baseSoc?.city || "").toLowerCase();
+      const chefArea = (c.area || baseSoc?.area || "").toLowerCase();
+      const cAddr = String(c.address || "").toLowerCase();
 
       const matchCity =
         chefPerfCity === "all" ||
-        String(c.city || "").toLowerCase() === chefPerfCity.toLowerCase() ||
-        linkedSocs.some((s) => String(s.city || "").toLowerCase() === chefPerfCity.toLowerCase());
+        chefCity === chefPerfCity.toLowerCase() ||
+        (!chefCity && cAddr.includes(chefPerfCity.toLowerCase()));
 
       const matchArea =
         chefPerfArea === "all" ||
-        String(c.area || "").toLowerCase() === chefPerfArea.toLowerCase() ||
-        linkedSocs.some((s) => String(s.area || "").toLowerCase() === chefPerfArea.toLowerCase());
+        chefArea === chefPerfArea.toLowerCase() ||
+        (!chefArea && cAddr.includes(chefPerfArea.toLowerCase()));
 
       const matchSociety =
         chefPerfSociety === "all" ||
-        String(c.baseSociety || "").toLowerCase() === chefPerfSociety.toLowerCase() ||
-        chefSocNames.some((sn) => String(sn).toLowerCase() === chefPerfSociety.toLowerCase());
+        String(c.baseSociety || "").toLowerCase() === chefPerfSociety.toLowerCase();
 
       return matchCity && matchArea && matchSociety;
     });
   }, [chefs, societies, chefPerfCity, chefPerfArea, chefPerfSociety]);
 
-  const handleExportSocietyReport = () => {
-    if (societies.length === 0 && chefs.length === 0) {
-      toast.info("No data available to export.");
+  // Individual Report Excel Exporters
+  const handleExportChefCustomerReport = () => {
+    if (!filteredChefCustomerSocieties.length) {
+      toast.info("No records match the active filters to export.");
+      return;
+    }
+    try {
+      const rows = filteredChefCustomerSocieties.map((s, i) => ({
+        "Sr No": i + 1,
+        "Society Name": toTitleCase(s.name),
+        "City": toTitleCase(s.city),
+        "Area": toTitleCase(s.area),
+        "Total Chefs": s.totalChefs || 0,
+        "Total Customers": s.totalCustomers || 0,
+      }));
+
+      const filterSuffix = chefCustCity !== "all" ? `_${chefCustCity}` : "";
+      exportToExcel(rows, `Chef_Customer_Count_Report${filterSuffix}`, "Chef & Customer Count");
+      toast.success(`Exported ${rows.length} society records to Excel!`);
+    } catch (err) {
+      toast.error("Failed to export report: " + err.message);
+    }
+  };
+
+  const handleExportOrdersRevenueReport = () => {
+    if (!filteredOrdersRevenueSocieties.length) {
+      toast.info("No records match the active filters to export.");
       return;
     }
     try {
       const rows = filteredOrdersRevenueSocieties.map((s, i) => ({
         "Sr No": i + 1,
         "Society Name": toTitleCase(s.name),
-        "Area": toTitleCase(s.area),
         "City": toTitleCase(s.city),
-        "Total Chefs": s.totalChefs || 0,
-        "Total Customers": s.totalCustomers || 0,
+        "Area": toTitleCase(s.area),
         "Total Orders": Math.round((s.totalOrders || 0) * periodMultiplier),
         "Total Revenue (INR)": Math.round((s.totalRevenue || 0) * periodMultiplier),
       }));
 
-      exportToExcel(rows, `Mothers_Kitchen_Analytics_${selectedPeriod}`, "Society Analytics");
-      toast.success("Analytics report exported to Excel!");
+      const filterSuffix = ordersCity !== "all" ? `_${ordersCity}` : "";
+      exportToExcel(rows, `Orders_Revenue_Report_${selectedPeriod}${filterSuffix}`, "Orders & Revenue");
+      toast.success(`Exported ${rows.length} society records to Excel!`);
+    } catch (err) {
+      toast.error("Failed to export report: " + err.message);
+    }
+  };
+
+  const handleExportChefPerformanceReport = () => {
+    if (!filteredChefPerformance.length) {
+      toast.info("No chef records match the active filters to export.");
+      return;
+    }
+    try {
+      const rows = filteredChefPerformance.map((chef, idx) => {
+        const totalOrders = Math.round((Number(chef.totalOrders || chef.ordersToday || 0)) * periodMultiplier);
+        const totalRevenue = Math.round((Number(chef.totalRevenue || 0)) * periodMultiplier);
+        const acceptedItems = Number(chef.acceptedItems ?? chef.acceptedOrders ?? totalOrders);
+        const rejectedItems = Number(chef.rejectedItems ?? chef.rejectedOrders ?? chef.consecutiveTimeouts ?? 0);
+        return {
+          "Sr No": idx + 1,
+          "Chef Name": toTitleCase(chef.fullName || chef.name || "Chef"),
+          "Base Society": toTitleCase(chef.baseSociety || "Not Set"),
+          "City": toTitleCase(chef.city || ""),
+          "Area": toTitleCase(chef.area || ""),
+          "Order": totalOrders,
+          "Revenue (INR)": totalRevenue,
+          "Accepted Items": acceptedItems,
+          "Rejected Items": rejectedItems,
+        };
+      });
+
+      const filterSuffix = chefPerfCity !== "all" ? `_${chefPerfCity}` : "";
+      exportToExcel(rows, `Chef_Performance_Report_${selectedPeriod}${filterSuffix}`, "Chef Performance");
+      toast.success(`Exported ${rows.length} chef performance records to Excel!`);
     } catch (err) {
       toast.error("Failed to export report: " + err.message);
     }
@@ -263,18 +343,6 @@ export function StatisticsReportsPage() {
                 />
               </div>
             )}
-          </div>
-
-          {/* Export Button Placed Near Filters */}
-          <div className="flex items-center gap-2.5 w-full lg:w-auto justify-end shrink-0">
-            <Button
-              onClick={handleExportSocietyReport}
-              variant="outline"
-              className="gap-2 h-10 rounded-xl hover:border-emerald-600 hover:text-emerald-700 transition-colors cursor-pointer"
-            >
-              <FileSpreadsheet className="size-4 text-emerald-600" />
-              <span>Export Analytics</span>
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -385,7 +453,7 @@ export function StatisticsReportsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Areas</SelectItem>
-                      {allAreas.map((ar) => (
+                      {chefCustAvailableAreas.map((ar) => (
                         <SelectItem key={ar} value={ar}>
                           {toTitleCase(ar)}
                         </SelectItem>
@@ -408,6 +476,17 @@ export function StatisticsReportsPage() {
                     <span>Reset</span>
                   </Button>
                 )}
+
+                {/* Export Report 1 Button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportChefCustomerReport}
+                  className="ml-auto h-8 text-xs font-semibold gap-1.5 rounded-lg border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-600 cursor-pointer"
+                >
+                  <FileSpreadsheet className="size-3.5 text-emerald-600" />
+                  <span>Export to Excel</span>
+                </Button>
               </div>
 
               {/* Table */}
@@ -527,7 +606,7 @@ export function StatisticsReportsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Areas</SelectItem>
-                      {allAreas.map((ar) => (
+                      {ordersAvailableAreas.map((ar) => (
                         <SelectItem key={ar} value={ar}>
                           {toTitleCase(ar)}
                         </SelectItem>
@@ -550,6 +629,17 @@ export function StatisticsReportsPage() {
                     <span>Reset</span>
                   </Button>
                 )}
+
+                {/* Export Report 2 Button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportOrdersRevenueReport}
+                  className="ml-auto h-8 text-xs font-semibold gap-1.5 rounded-lg border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-600 cursor-pointer"
+                >
+                  <FileSpreadsheet className="size-3.5 text-emerald-600" />
+                  <span>Export to Excel</span>
+                </Button>
               </div>
 
               {/* Table */}
@@ -676,7 +766,7 @@ export function StatisticsReportsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Areas</SelectItem>
-                      {allAreas.map((ar) => (
+                      {chefPerfAvailableAreas.map((ar) => (
                         <SelectItem key={ar} value={ar}>
                           {toTitleCase(ar)}
                         </SelectItem>
@@ -696,7 +786,7 @@ export function StatisticsReportsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="all">All Societies</SelectItem>
-                      {allSocieties.map((soc) => (
+                      {chefPerfAvailableSocieties.map((soc) => (
                         <SelectItem key={soc} value={soc}>
                           {toTitleCase(soc)}
                         </SelectItem>
@@ -720,6 +810,17 @@ export function StatisticsReportsPage() {
                     <span>Reset</span>
                   </Button>
                 )}
+
+                {/* Export Report 3 Button */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleExportChefPerformanceReport}
+                  className="ml-auto h-8 text-xs font-semibold gap-1.5 rounded-lg border-emerald-600/40 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-600 cursor-pointer"
+                >
+                  <FileSpreadsheet className="size-3.5 text-emerald-600" />
+                  <span>Export to Excel</span>
+                </Button>
               </div>
 
               {/* Table: Chef | Order | Revenue | Accepted Items | Rejected Items */}
