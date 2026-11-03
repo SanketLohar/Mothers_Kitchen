@@ -1603,8 +1603,8 @@ export function ChefManagementPage() {
                   <SelectValue placeholder="Select User Role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="chef">Chef (Home Cook)</SelectItem>
-                  <SelectItem value="marketplace">Marketplace (Vendor / Store)</SelectItem>
+                  <SelectItem value="chef">Chef</SelectItem>
+                  <SelectItem value="marketplace">Marketplace</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
