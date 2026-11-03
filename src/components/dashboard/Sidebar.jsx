@@ -20,7 +20,7 @@ import { signOut } from "firebase/auth";
 const navItems = [
   { to: "/super-admin", label: "Dashboard", icon: LayoutDashboard },
   { to: "/super-admin/society", label: "Society Management", icon: Building2 },
-  { to: "/super-admin/chefs", label: "Chef Management", icon: ChefHat },
+  { to: "/super-admin/chefs", label: "User Management", icon: Users },
   { to: "/super-admin/highlights", label: "Customer App Highlights", icon: Sparkles },
   { to: "/super-admin/customers", label: "Customer Database", icon: Users },
   { to: "/super-admin/reports", label: "Statistics and Report", icon: BarChart3 },

@@ -112,6 +112,7 @@ export function subscribeToChefs(callback, onError) {
         return {
           id: docSnap.id,
           ...data,
+          role: data.role || "chef",
           fullName: data.fullName || data.name || "Chef",
           isActive,
           isDeactivatedByAdmin: isDeactivated,
@@ -280,6 +281,7 @@ export async function createChef(data) {
 
   const chefDocData = {
     chefId,
+    role: data.role || "chef",
     fullName: data.fullName.trim(),
     name: data.fullName.trim(),
     mobileNumber: data.mobileNumber.trim(),
@@ -333,6 +335,7 @@ export async function updateChef(chefId, data) {
   const updatePayload = {
     fullName: data.fullName.trim(),
     name: data.fullName.trim(),
+    role: data.role || "chef",
     mobileNumber: data.mobileNumber.trim(),
     loginMobile: cleanMobile,
     email: data.email?.trim().toLowerCase() || "",

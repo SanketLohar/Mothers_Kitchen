@@ -25,6 +25,7 @@ import {
   ZoomIn,
   ExternalLink,
   X,
+  Store,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -260,6 +261,9 @@ export function ChefManagementPage() {
     (selectedDeliveringSociety !== "all" ? 1 : 0) +
     (statusFilter !== "all" ? 1 : 0);
 
+  // Active Role Tab: 'chef' or 'marketplace'
+  const [activeRoleTab, setActiveRoleTab] = useState("chef");
+
   // Modal States
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingChef, setEditingChef] = useState(null);
@@ -275,6 +279,7 @@ export function ChefManagementPage() {
 
   // Form State for Add / Edit Chef (BRD p. 20)
   const [formData, setFormData] = useState({
+    role: "chef",
     fullName: "",
     email: "",
     mobileNumber: "",
@@ -530,6 +535,7 @@ export function ChefManagementPage() {
   };
 
   const initialChefFormData = {
+    role: "chef",
     fullName: "",
     email: "",
     mobileNumber: "",
@@ -559,7 +565,10 @@ export function ChefManagementPage() {
 
   const handleOpenAddModal = () => {
     setEditingChef(null);
-    setFormData({ ...initialChefFormData });
+    setFormData({
+      ...initialChefFormData,
+      role: activeRoleTab,
+    });
     setAssignFilterCity("all");
     setAssignFilterArea("all");
     setIsAddModalOpen(true);
@@ -580,6 +589,7 @@ export function ChefManagementPage() {
     const isActive = isDeactivated ? false : (chef.isActive !== undefined ? Boolean(chef.isActive) : true);
 
     setFormData({
+      role: chef.role || "chef",
       fullName: toTitleCase(chef.fullName || chef.name || ""),
       email: chef.email || "",
       mobileNumber: chef.mobileNumber || "",
@@ -899,8 +909,9 @@ export function ChefManagementPage() {
     try {
       const exportRows = filteredChefs.map((c, i) => ({
         "Sr No": i + 1,
-        "Chef ID": c.id,
-        "Chef Name": toTitleCase(c.fullName || c.name || "Chef"),
+        "User ID": c.id,
+        "Role": c.role === "marketplace" ? "Marketplace Partner" : "Chef",
+        "Name": toTitleCase(c.fullName || c.name || "User"),
         "Mobile Number": c.mobileNumber,
         "Auth Email": c.authEmail || c.email || "N/A",
         "Default Password": c.defaultPassword || c.password || "N/A",
@@ -908,15 +919,16 @@ export function ChefManagementPage() {
         "Address": c.address || "",
         "Aadhar Card Number": c.idCardNumber || c.aadharNumber || "",
         "Admin Login Status": c.isDeactivatedByAdmin ? "Blocked by Admin" : "Enabled by Admin",
-        "Chef Mobile App Status": c.isActive ? "Active (Taking Orders)" : "Inactive (Offline)",
+        "Mobile App Status": c.isActive ? "Active (Online)" : "Inactive (Offline)",
         "Rating": Number(c.rating || 5.0),
         "Total Orders": Number(c.totalOrders || 0),
       }));
 
       const dateStr = new Date().toISOString().slice(0, 10);
+      const rolePrefix = activeRoleTab === "marketplace" ? "Marketplace" : "Chefs";
       const safeSoc = selectedSociety !== "all" ? `_${String(selectedSociety || "").replace(/\s+/g, "_")}` : "";
-      exportToExcel(exportRows, `Mothers_Kitchen_Chefs${safeSoc}_${dateStr}`, "Chefs");
-      toast.success(`Exported ${exportRows.length} chef records to Excel (.xlsx)!`);
+      exportToExcel(exportRows, `Mothers_Kitchen_${rolePrefix}${safeSoc}_${dateStr}`, rolePrefix);
+      toast.success(`Exported ${exportRows.length} ${rolePrefix.toLowerCase()} records to Excel (.xlsx)!`);
     } catch (err) {
       console.error("Excel export error:", err);
       toast.error("Failed to generate Excel file: " + err.message);
@@ -1011,9 +1023,14 @@ export function ChefManagementPage() {
         }
       }
 
+      // Filter by role tab (Chefs vs Marketplace)
+      const userRole = c.role || "chef";
+      const matchesRole = activeRoleTab === "marketplace" ? userRole === "marketplace" : userRole !== "marketplace";
+      if (!matchesRole) return false;
+
       return matchesSearch && matchesStatus && matchesCity && matchesArea && matchesBaseSociety && matchesDeliveringSociety;
     });
-  }, [chefs, searchQuery, statusFilter, selectedCity, selectedArea, selectedBaseSociety, selectedDeliveringSociety, societiesList]);
+  }, [chefs, activeRoleTab, searchQuery, statusFilter, selectedCity, selectedArea, selectedBaseSociety, selectedDeliveringSociety, societiesList]);
 
   // Pagination (10 rows per page)
   const totalChefs = filteredChefs.length;
@@ -1030,15 +1047,61 @@ export function ChefManagementPage() {
 
   return (
     <Shell
-      title="Chef Management"
-      subtitle="Register chefs, provision mobile logins, manage deliverable society allotments and enable/disable access."
+      title="User Management"
+      subtitle="Register chefs and marketplace partners, provision mobile logins, manage deliverable societies and enable/disable access."
       headerAction={
         <Button onClick={handleOpenAddModal} className="gap-2 rounded-xl cursor-pointer">
           <Plus className="size-4" />
-          <span>Add Chef</span>
+          <span>Add User</span>
         </Button>
       }
     >
+      {/* Role Panels / Tabs: Chefs | Marketplace */}
+      <div className="flex items-center gap-2 border-b border-border mb-4">
+        <button
+          type="button"
+          onClick={() => {
+            setActiveRoleTab("chef");
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+            activeRoleTab === "chef"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <ChefHat className="size-4" />
+          <span>Chefs</span>
+          <Badge
+            variant={activeRoleTab === "chef" ? "default" : "secondary"}
+            className="text-xs px-2 py-0.5"
+          >
+            {chefs.filter((c) => (c.role || "chef") !== "marketplace").length}
+          </Badge>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveRoleTab("marketplace");
+            setCurrentPage(1);
+          }}
+          className={`flex items-center gap-2 pb-3 px-3 text-sm font-bold border-b-2 transition-all cursor-pointer ${
+            activeRoleTab === "marketplace"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <Store className="size-4" />
+          <span>Marketplace</span>
+          <Badge
+            variant={activeRoleTab === "marketplace" ? "default" : "secondary"}
+            className="text-xs px-2 py-0.5"
+          >
+            {chefs.filter((c) => c.role === "marketplace").length}
+          </Badge>
+        </button>
+      </div>
+
       {/* Search and Filters Bar (Laundrysta Style) */}
       <Card className="border-border">
         <CardContent className="p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -1274,7 +1337,7 @@ export function ChefManagementPage() {
             {paginatedChefs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                  No chefs match your search criteria.
+                  No {activeRoleTab === "marketplace" ? "marketplace partners" : "chefs"} match your search criteria.
                 </TableCell>
               </TableRow>
             ) : (
@@ -1499,9 +1562,13 @@ export function ChefManagementPage() {
           <DialogHeader>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <DialogTitle>{editingChef ? "Edit Chef Profile" : "Add Chef & Provision Login"}</DialogTitle>
+                <DialogTitle>
+                  {editingChef
+                    ? formData.role === "marketplace" ? "Edit Marketplace Partner Profile" : "Edit Chef Profile"
+                    : formData.role === "marketplace" ? "Add Marketplace Partner & Provision Login" : "Add Chef & Provision Login"}
+                </DialogTitle>
                 <DialogDescription>
-                  Register a cook, allocate deliverable societies from the society directory, and configure login credentials.
+                  Register a {formData.role === "marketplace" ? "marketplace vendor" : "cook"}, allocate deliverable societies from the society directory, and configure login credentials.
                 </DialogDescription>
               </div>
               {editingChef && (
@@ -1523,6 +1590,28 @@ export function ChefManagementPage() {
           </DialogHeader>
 
           <form onSubmit={handleSaveChef} className="space-y-4 py-2">
+            {/* User Role Selection */}
+            <div className="space-y-1.5 p-3 rounded-xl bg-muted/40 border border-border">
+              <Label htmlFor="userRole" className="text-xs font-bold text-foreground">
+                User Role *
+              </Label>
+              <Select
+                value={formData.role || "chef"}
+                onValueChange={(val) => setFormData((prev) => ({ ...prev, role: val }))}
+              >
+                <SelectTrigger id="userRole" className="w-full h-10 rounded-xl bg-card">
+                  <SelectValue placeholder="Select User Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="chef">Chef (Home Cook)</SelectItem>
+                  <SelectItem value="marketplace">Marketplace (Vendor / Store)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Determines whether this account appears under Chefs or the Marketplace panel.
+              </p>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="chefName">Full Name *</Label>
@@ -2203,6 +2292,12 @@ export function ChefManagementPage() {
               </div>
             </div>
 
+            <div className="flex justify-between border-b pb-2">
+              <span className="text-muted-foreground">User Role:</span>
+              <Badge variant="outline" className="font-semibold text-xs capitalize">
+                {activeViewingChef?.role === "marketplace" ? "Marketplace Partner" : "Chef"}
+              </Badge>
+            </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Mobile:</span>
               <span className="font-semibold">{activeViewingChef?.mobileNumber}</span>

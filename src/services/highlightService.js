@@ -79,3 +79,78 @@ export async function saveHighlightSlot(slotNumber, data) {
     { merge: true }
   );
 }
+
+/**
+ * Subscribes to the 4 society-specific highlight slots from Firestore:
+ * societies/{societyId}/highlights
+ */
+export function subscribeToSocietyHighlights(societyId, callback) {
+  if (!isFirebaseConfigured || !db || !societyId) {
+    callback(EMPTY_HIGHLIGHTS);
+    return () => {};
+  }
+
+  const colRef = collection(db, "societies", societyId, "highlights");
+
+  return onSnapshot(
+    colRef,
+    (snapshot) => {
+      if (snapshot.empty) {
+        callback(EMPTY_HIGHLIGHTS);
+        return;
+      }
+
+      const map = {};
+      snapshot.docs.forEach((d) => {
+        const data = d.data();
+        map[data.slotNumber] = { id: d.id, ...data };
+      });
+
+      const result = [1, 2, 3, 4].map((slot) => {
+        return (
+          map[slot] || {
+            slotNumber: slot,
+            title: "",
+            subtitle: "",
+            imageUrl: "",
+            isActive: false,
+          }
+        );
+      });
+
+      callback(result);
+    },
+    (err) => {
+      console.warn("Society highlights subscription error:", err);
+      callback(EMPTY_HIGHLIGHTS);
+    }
+  );
+}
+
+/**
+ * Saves a society-specific highlight slot into Firestore:
+ * societies/{societyId}/highlights/slot-{slotNumber}
+ */
+export async function saveSocietyHighlightSlot(societyId, slotNumber, data) {
+  if (!isFirebaseConfigured || !db) {
+    throw new Error("Firebase is not configured.");
+  }
+  if (!societyId) {
+    throw new Error("Society ID is required.");
+  }
+
+  const docRef = doc(db, "societies", societyId, "highlights", `slot-${slotNumber}`);
+  return await setDoc(
+    docRef,
+    {
+      slotNumber,
+      societyId,
+      title: data.title || "",
+      subtitle: data.subtitle || "",
+      imageUrl: data.imageUrl || "",
+      isActive: Boolean(data.isActive),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
