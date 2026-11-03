@@ -468,9 +468,7 @@ export function StatisticsReportsPage() {
         "Area": toTitleCase(chef.area || ""),
         "Total Orders": chef.totalOrders || 0,
         "Revenue (INR)": chef.totalRevenue || 0,
-        "Accepted Orders": chef.acceptedOrders || 0,
         "Accepted Items": chef.acceptedItems || 0,
-        "Rejected Orders": chef.rejectedOrders || 0,
         "Rejected Items": chef.rejectedItems || 0,
       }));
 
@@ -1015,7 +1013,7 @@ export function StatisticsReportsPage() {
                 </Button>
               </div>
 
-              {/* Table: Chef | Total Orders | Revenue | Accepted | Rejected */}
+              {/* Table: Chef | Total Orders | Revenue | Accepted Items | Rejected Items */}
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1023,8 +1021,8 @@ export function StatisticsReportsPage() {
                     <TableHead>Chef</TableHead>
                     <TableHead className="text-center font-bold">Total Orders</TableHead>
                     <TableHead className="text-right font-bold">Revenue</TableHead>
-                    <TableHead className="text-center font-bold">Accepted</TableHead>
-                    <TableHead className="text-center font-bold">Rejected</TableHead>
+                    <TableHead className="text-center font-bold">Accepted Items</TableHead>
+                    <TableHead className="text-center font-bold">Rejected Items</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1038,8 +1036,6 @@ export function StatisticsReportsPage() {
                     filteredChefPerformance.map((chef, idx) => {
                       const totalOrders = chef.totalOrders || 0;
                       const totalRevenue = chef.totalRevenue || 0;
-                      const acceptedOrders = chef.acceptedOrders || 0;
-                      const rejectedOrders = chef.rejectedOrders || 0;
                       const acceptedItems = chef.acceptedItems || 0;
                       const rejectedItems = chef.rejectedItems || 0;
 
@@ -1069,30 +1065,20 @@ export function StatisticsReportsPage() {
                             {formatCurrency(totalRevenue)}
                           </TableCell>
                           <TableCell className="text-center">
-                            <div className="flex flex-col items-center">
-                              <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-xs">
-                                <CheckCircle2 className="size-3 text-emerald-600" />
-                                <span>{acceptedOrders} {acceptedOrders === 1 ? "Order" : "Orders"}</span>
-                              </span>
-                              <span className="text-[10px] text-muted-foreground mt-0.5">
-                                ({acceptedItems} {acceptedItems === 1 ? "dish" : "dishes"})
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs">
+                              <CheckCircle2 className="size-3 text-emerald-600" />
+                              <span>{acceptedItems}</span>
+                            </span>
                           </TableCell>
                           <TableCell className="text-center">
-                            <div className="flex flex-col items-center">
-                              <span className={`inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full text-xs ${
-                                rejectedOrders > 0
-                                  ? "text-rose-700 bg-rose-50 border border-rose-200"
-                                  : "text-muted-foreground bg-muted border border-border"
-                              }`}>
-                                <XCircle className={`size-3 ${rejectedOrders > 0 ? "text-rose-600" : "text-muted-foreground"}`} />
-                                <span>{rejectedOrders} {rejectedOrders === 1 ? "Order" : "Orders"}</span>
-                              </span>
-                              <span className="text-[10px] text-muted-foreground mt-0.5">
-                                ({rejectedItems} {rejectedItems === 1 ? "dish" : "dishes"})
-                              </span>
-                            </div>
+                            <span className={`inline-flex items-center gap-1 font-semibold px-2.5 py-0.5 rounded-full text-xs ${
+                              rejectedItems > 0
+                                ? "text-rose-700 bg-rose-50 border border-rose-200"
+                                : "text-muted-foreground bg-muted border border-border"
+                            }`}>
+                              <XCircle className={`size-3 ${rejectedItems > 0 ? "text-rose-600" : "text-muted-foreground"}`} />
+                              <span>{rejectedItems}</span>
+                            </span>
                           </TableCell>
                         </TableRow>
                       );
