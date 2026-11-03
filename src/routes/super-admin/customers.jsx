@@ -130,15 +130,19 @@ export function CustomersPage() {
   const filteredCustomers = useMemo(() => {
     return customers.filter((cust) => {
       const q = searchQuery.toLowerCase().trim();
+      const custName = String(cust.name || cust.fullName || "").toLowerCase();
+      const custPhone = String(cust.mobileNumber || cust.mobile || "").toLowerCase();
+      const custAddr = String(typeof cust.address === "string" ? cust.address : "").toLowerCase();
+
       const matchesSearch =
         !q ||
-        cust.name.toLowerCase().includes(q) ||
-        cust.mobileNumber.toLowerCase().includes(q) ||
-        cust.address.toLowerCase().includes(q);
+        custName.includes(q) ||
+        custPhone.includes(q) ||
+        custAddr.includes(q);
 
-      const matchesCity = selectedCity === "all" || cust.city === selectedCity;
-      const matchesArea = selectedArea === "all" || cust.area === selectedArea;
-      const matchesSociety = selectedSociety === "all" || cust.society === selectedSociety;
+      const matchesCity = selectedCity === "all" || (cust.city || "").toLowerCase() === selectedCity.toLowerCase();
+      const matchesArea = selectedArea === "all" || (cust.area || "").toLowerCase() === selectedArea.toLowerCase();
+      const matchesSociety = selectedSociety === "all" || (cust.society || "").toLowerCase() === selectedSociety.toLowerCase();
 
       return matchesSearch && matchesCity && matchesArea && matchesSociety;
     });
@@ -171,13 +175,13 @@ export function CustomersPage() {
     try {
       const exportRows = filteredCustomers.map((c, i) => ({
         "Sr No": i + 1,
-        "Customer Name": toTitleCase(c.name),
-        "Mobile Number": c.mobileNumber,
+        "Customer Name": toTitleCase(c.name || c.fullName || "Resident"),
+        "Mobile Number": c.mobileNumber || c.mobile || "",
         "Email ID": c.email || "N/A",
-        "Delivery Address": c.address,
-        "Society": toTitleCase(c.society),
-        "Area": toTitleCase(c.area),
-        "City": toTitleCase(c.city),
+        "Delivery Address": typeof c.address === "string" ? c.address : "",
+        "Society": toTitleCase(c.society || ""),
+        "Area": toTitleCase(c.area || ""),
+        "City": toTitleCase(c.city || ""),
       }));
 
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -321,17 +325,17 @@ export function CustomersPage() {
                     {(currentPage - 1) * pageSize + idx + 1}
                   </TableCell>
                   <TableCell className="font-bold text-foreground">
-                    {toTitleCase(cust.name)}
+                    {toTitleCase(cust.name || cust.fullName || "Resident")}
                   </TableCell>
                   <TableCell className="font-mono text-sm text-foreground">
-                    {cust.mobileNumber}
+                    {cust.mobileNumber || cust.mobile || "—"}
                   </TableCell>
-                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={cust.address}>
-                    {cust.address}
+                  <TableCell className="text-xs text-muted-foreground max-w-xs truncate" title={typeof cust.address === "string" ? cust.address : ""}>
+                    {typeof cust.address === "string" ? cust.address : "—"}
                   </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">{toTitleCase(cust.city)}</TableCell>
-                  <TableCell className="font-medium text-foreground text-sm">{toTitleCase(cust.area)}</TableCell>
-                  <TableCell className="text-sm font-semibold text-primary">{toTitleCase(cust.society)}</TableCell>
+                  <TableCell className="text-muted-foreground text-sm">{toTitleCase(cust.city || "")}</TableCell>
+                  <TableCell className="font-medium text-foreground text-sm">{toTitleCase(cust.area || "")}</TableCell>
+                  <TableCell className="text-sm font-semibold text-primary">{toTitleCase(cust.society || "")}</TableCell>
                   <TableCell className="text-right">
                     <Button
                       variant="ghost"
@@ -400,16 +404,16 @@ export function CustomersPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="size-5 text-primary" />
-              <span>{toTitleCase(viewingCustomer?.name)}</span>
+              <span>{toTitleCase(viewingCustomer?.name || viewingCustomer?.fullName || "Resident")}</span>
             </DialogTitle>
             <DialogDescription>
-              Registered Resident • {toTitleCase(viewingCustomer?.society)}
+              Registered Resident • {toTitleCase(viewingCustomer?.society || "")}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2 text-sm">
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Mobile Number:</span>
-              <span className="font-mono font-bold">{viewingCustomer?.mobileNumber}</span>
+              <span className="font-mono font-bold">{viewingCustomer?.mobileNumber || viewingCustomer?.mobile || "—"}</span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Email:</span>
@@ -417,16 +421,16 @@ export function CustomersPage() {
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Society:</span>
-              <span className="font-semibold text-primary">{toTitleCase(viewingCustomer?.society)}</span>
+              <span className="font-semibold text-primary">{toTitleCase(viewingCustomer?.society || "")}</span>
             </div>
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">Area & City:</span>
-              <span>{toTitleCase(viewingCustomer?.area)}, {toTitleCase(viewingCustomer?.city)}</span>
+              <span>{toTitleCase(viewingCustomer?.area || "")}, {toTitleCase(viewingCustomer?.city || "")}</span>
             </div>
             <div className="space-y-1">
               <span className="text-xs font-bold text-muted-foreground uppercase">Complete Flat Address:</span>
               <p className="p-3 rounded-lg bg-muted/50 border text-xs leading-relaxed font-medium">
-                {viewingCustomer?.address}
+                {typeof viewingCustomer?.address === "string" ? viewingCustomer?.address : "—"}
               </p>
             </div>
           </div>

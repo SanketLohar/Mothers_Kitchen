@@ -42,10 +42,21 @@ import { toast } from "sonner";
 import { subscribeToDashboardKpis } from "@/services/dashboardService";
 import { subscribeToSocieties } from "@/services/societyService";
 import { subscribeToChefs } from "@/services/chefService";
+import { subscribeToOrders } from "@/services/orderService";
 
 export const Route = createFileRoute("/super-admin/reports")({
   component: StatisticsReportsPage,
 });
+
+function parseOrderDate(order) {
+  if (!order) return null;
+  const val = order.createdAt || order.timestamp || order.date;
+  if (!val) return null;
+  if (typeof val.toDate === "function") return val.toDate();
+  if (val.seconds) return new Date(val.seconds * 1000);
+  const d = new Date(val);
+  return isNaN(d.getTime()) ? null : d;
+}
 
 export function StatisticsReportsPage() {
   const [selectedPeriod, setSelectedPeriod] = useState("this_month");
@@ -60,6 +71,7 @@ export function StatisticsReportsPage() {
   });
   const [societies, setSocieties] = useState([]);
   const [chefs, setChefs] = useState([]);
+  const [orders, setOrders] = useState([]);
 
   // Collapsible states — collapsed by default as requested
   const [isChefCustomerExpanded, setIsChefCustomerExpanded] = useState(false);
@@ -92,36 +104,84 @@ export function StatisticsReportsPage() {
       setChefs(list || []);
     });
 
+    const unsubOrders = subscribeToOrders((list) => {
+      setOrders(list || []);
+    });
+
     return () => {
       unsubKpis();
       unsubSocs();
       unsubChefs();
+      unsubOrders();
     };
   }, []);
 
-  // Multiplier for previewing date-filtered periods
-  const periodMultiplier = useMemo(() => {
-    switch (selectedPeriod) {
-      case "today":
-        return 0.1;
-      case "yesterday":
-        return 0.1;
-      case "this_week":
-        return 0.4;
-      case "this_month":
-      default:
-        return 1.0;
-    }
-  }, [selectedPeriod]);
+  // Filter real Firestore orders by the selected reporting period in Asia/Kolkata
+  const filteredOrdersByPeriod = useMemo(() => {
+    if (!orders.length) return [];
 
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+
+    const todayYMD = formatter.format(now);
+    const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const yesterdayYMD = formatter.format(yesterdayDate);
+
+    const currentMonthPrefix = todayYMD.slice(0, 7);
+
+    const dayOfWeek = (now.getDay() + 6) % 7;
+    const startOfWeek = new Date(now.getTime() - dayOfWeek * 24 * 60 * 60 * 1000);
+    const startOfWeekYMD = formatter.format(startOfWeek);
+
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+    return orders.filter((o) => {
+      const d = parseOrderDate(o);
+      if (!d) return true;
+      const orderYMD = formatter.format(d);
+
+      switch (selectedPeriod) {
+        case "today":
+          return orderYMD === todayYMD;
+        case "yesterday":
+          return orderYMD === yesterdayYMD;
+        case "this_week":
+          return orderYMD >= startOfWeekYMD && orderYMD <= todayYMD;
+        case "this_month":
+          return orderYMD.startsWith(currentMonthPrefix) || d >= thirtyDaysAgo;
+        case "custom":
+          return (
+            (!customStartDate || orderYMD >= customStartDate) &&
+            (!customEndDate || orderYMD <= customEndDate)
+          );
+        default:
+          return true;
+      }
+    });
+  }, [orders, selectedPeriod, customStartDate, customEndDate]);
+
+  // Aggregate stats derived directly from actual DB orders and collections
   const activeStats = useMemo(() => {
+    const totalOrdersCount = filteredOrdersByPeriod.length;
+    let totalRevenueSum = 0;
+    filteredOrdersByPeriod.forEach((o) => {
+      if (o.status !== "rejected" && o.status !== "cancelled") {
+        totalRevenueSum += Number(o.totalAmount || o.amount || o.itemTotal || 0);
+      }
+    });
+
     return {
-      chefs: stats.totalChefs,
+      chefs: stats.totalChefs || chefs.length,
       customers: stats.totalCustomers,
-      orders: Math.round(stats.totalOrders * periodMultiplier),
-      revenue: Math.round(stats.totalRevenue * periodMultiplier),
+      orders: totalOrdersCount,
+      revenue: totalRevenueSum,
     };
-  }, [stats, periodMultiplier]);
+  }, [filteredOrdersByPeriod, stats, chefs.length]);
 
   // Distinct cities across societies and chefs
   const allCities = useMemo(() => {
@@ -172,18 +232,51 @@ export function StatisticsReportsPage() {
     });
   }, [societies, chefCustCity, chefCustArea]);
 
-  // 2. Filtered data for Report 2: Orders / Revenue per Society
+  // 2. Filtered data for Report 2: Orders / Revenue per Society (derived from DB orders)
   const filteredOrdersRevenueSocieties = useMemo(() => {
-    return societies.filter((s) => {
+    const list = societies.filter((s) => {
       const matchCity = ordersCity === "all" || String(s.city || "").toLowerCase() === ordersCity.toLowerCase();
       const matchArea = ordersArea === "all" || String(s.area || "").toLowerCase() === ordersArea.toLowerCase();
       return matchCity && matchArea;
     });
-  }, [societies, ordersCity, ordersArea]);
 
-  // 3. Filtered data for Report 3: Chef Performance
+    return list.map((s) => {
+      const socId = String(s.id || "").toLowerCase();
+      const socName = String(s.name || "").toLowerCase();
+
+      // Find real matching orders from filteredOrdersByPeriod
+      const matchingOrders = filteredOrdersByPeriod.filter((o) => {
+        const addr = o.deliveryAddress;
+        const oSocId = String(addr?.societyId || o.societyId || "").toLowerCase();
+        const oSocName = String(addr?.societyName || o.societyName || o.society || "").toLowerCase();
+        const oAddrText = typeof o.deliveryAddress === "string" ? o.deliveryAddress.toLowerCase() : "";
+
+        return (
+          (oSocId && (oSocId === socId || oSocId === `soc_${socId}`)) ||
+          (oSocName && (oSocName === socName || oSocName.includes(socName) || socName.includes(oSocName))) ||
+          (oAddrText && oAddrText.includes(socName))
+        );
+      });
+
+      const totalOrdersCount = matchingOrders.length;
+      let totalRevenueSum = 0;
+      matchingOrders.forEach((o) => {
+        if (o.status !== "rejected" && o.status !== "cancelled") {
+          totalRevenueSum += Number(o.totalAmount || o.amount || o.itemTotal || 0);
+        }
+      });
+
+      return {
+        ...s,
+        totalOrders: totalOrdersCount,
+        totalRevenue: totalRevenueSum,
+      };
+    }).sort((a, b) => b.totalOrders - a.totalOrders || b.totalRevenue - a.totalRevenue || a.name.localeCompare(b.name));
+  }, [societies, filteredOrdersByPeriod, ordersCity, ordersArea]);
+
+  // 3. Filtered data for Report 3: Chef Performance (derived from DB orders)
   const filteredChefPerformance = useMemo(() => {
-    return chefs.filter((c) => {
+    const list = chefs.filter((c) => {
       const baseSoc = societies.find(
         (s) =>
           (s.name && (c.baseSociety || "").toLowerCase() === s.name.toLowerCase()) ||
@@ -209,7 +302,109 @@ export function StatisticsReportsPage() {
 
       return matchCity && matchArea && matchSociety;
     });
-  }, [chefs, societies, chefPerfCity, chefPerfArea, chefPerfSociety]);
+
+    return list.map((c) => {
+      const chefId = String(c.chefId || c.id || "").toUpperCase();
+      const chefIdClean = chefId.replace(/[^A-Z0-9_]/gi, "");
+
+      let chefOrdersCount = 0;
+      let chefRevenue = 0;
+      let acceptedOrders = 0;
+      let rejectedOrders = 0;
+      let acceptedItems = 0;
+      let rejectedItems = 0;
+
+      filteredOrdersByPeriod.forEach((order) => {
+        const subOrders = order.subOrders || order.chefSubOrders || {};
+        const matchingKey = Object.keys(subOrders).find(
+          (k) => k.toUpperCase() === chefId || k.toUpperCase() === chefIdClean
+        );
+        const subOrder = matchingKey ? subOrders[matchingKey] : null;
+
+        const items = Array.isArray(order.items) ? order.items : [];
+        const chefItems = items.filter((it) => {
+          const itChefId = String(it.chefId || "").toUpperCase();
+          return itChefId === chefId || (matchingKey && itChefId === matchingKey.toUpperCase());
+        });
+
+        const isChefInOrder = Boolean(
+          subOrder ||
+          chefItems.length > 0 ||
+          order.chefStatuses?.[chefId] ||
+          order.chefStatuses?.[matchingKey]
+        );
+
+        if (!isChefInOrder) return;
+
+        chefOrdersCount += 1;
+
+        let isOrderRejected = false;
+        let orderAcceptedQty = 0;
+        let orderRejectedQty = 0;
+
+        if (subOrder && Array.isArray(subOrder.items) && subOrder.items.length > 0) {
+          const subSt = String(subOrder.status || "").toLowerCase();
+          subOrder.items.forEach((it) => {
+            const qty = Number(it.quantity || 1);
+            const price = Number(it.totalPrice || it.subtotal || (Number(it.unitPrice || it.pricePerPlate || 0) * qty) || 0);
+            const itemSt = String(it.itemStatus || it.status || it.orderStatus || subSt || "").toLowerCase();
+
+            if (itemSt === "rejected" || itemSt === "cancelled") {
+              rejectedItems += qty;
+              orderRejectedQty += qty;
+            } else {
+              acceptedItems += qty;
+              orderAcceptedQty += qty;
+              chefRevenue += price;
+            }
+          });
+          isOrderRejected = subSt === "rejected" || subSt === "cancelled" || (orderAcceptedQty === 0 && orderRejectedQty > 0);
+        } else if (chefItems.length > 0) {
+          const chefSt = String(order.chefStatuses?.[chefId] || order.chefStatuses?.[matchingKey] || order.status || "").toLowerCase();
+          chefItems.forEach((it) => {
+            const qty = Number(it.quantity || 1);
+            const price = Number(it.totalPrice || it.subtotal || (Number(it.unitPrice || it.pricePerPlate || 0) * qty) || 0);
+            const itemSt = String(it.itemStatus || it.status || it.orderStatus || chefSt || "").toLowerCase();
+
+            if (itemSt === "rejected" || itemSt === "cancelled") {
+              rejectedItems += qty;
+              orderRejectedQty += qty;
+            } else {
+              acceptedItems += qty;
+              orderAcceptedQty += qty;
+              chefRevenue += price;
+            }
+          });
+          isOrderRejected = chefSt.includes("reject") || (orderAcceptedQty === 0 && orderRejectedQty > 0);
+        } else {
+          const orderSt = String(order.chefStatuses?.[chefId] || order.chefStatuses?.[matchingKey] || order.status || "").toLowerCase();
+          if (orderSt.includes("reject") || orderSt.includes("cancel")) {
+            rejectedItems += 1;
+            isOrderRejected = true;
+          } else {
+            acceptedItems += 1;
+            chefRevenue += Number(subOrder?.totalAmount || order.totalAmount || 0);
+          }
+        }
+
+        if (isOrderRejected) {
+          rejectedOrders += 1;
+        } else {
+          acceptedOrders += 1;
+        }
+      });
+
+      return {
+        ...c,
+        totalOrders: chefOrdersCount,
+        totalRevenue: chefRevenue,
+        acceptedOrders,
+        rejectedOrders,
+        acceptedItems,
+        rejectedItems,
+      };
+    }).sort((a, b) => b.totalOrders - a.totalOrders || b.totalRevenue - a.totalRevenue || (a.fullName || "").localeCompare(b.fullName || ""));
+  }, [chefs, societies, filteredOrdersByPeriod, chefPerfCity, chefPerfArea, chefPerfSociety]);
 
   // Individual Report Excel Exporters
   const handleExportChefCustomerReport = () => {
@@ -246,8 +441,8 @@ export function StatisticsReportsPage() {
         "Society Name": toTitleCase(s.name),
         "City": toTitleCase(s.city),
         "Area": toTitleCase(s.area),
-        "Total Orders": Math.round((s.totalOrders || 0) * periodMultiplier),
-        "Total Revenue (INR)": Math.round((s.totalRevenue || 0) * periodMultiplier),
+        "Total Orders": s.totalOrders || 0,
+        "Total Revenue (INR)": s.totalRevenue || 0,
       }));
 
       const filterSuffix = ordersCity !== "all" ? `_${ordersCity}` : "";
@@ -264,23 +459,20 @@ export function StatisticsReportsPage() {
       return;
     }
     try {
-      const rows = filteredChefPerformance.map((chef, idx) => {
-        const totalOrders = Math.round((Number(chef.totalOrders || chef.ordersToday || 0)) * periodMultiplier);
-        const totalRevenue = Math.round((Number(chef.totalRevenue || 0)) * periodMultiplier);
-        const acceptedItems = Number(chef.acceptedItems ?? chef.acceptedOrders ?? totalOrders);
-        const rejectedItems = Number(chef.rejectedItems ?? chef.rejectedOrders ?? chef.consecutiveTimeouts ?? 0);
-        return {
-          "Sr No": idx + 1,
-          "Chef Name": toTitleCase(chef.fullName || chef.name || "Chef"),
-          "Base Society": toTitleCase(chef.baseSociety || "Not Set"),
-          "City": toTitleCase(chef.city || ""),
-          "Area": toTitleCase(chef.area || ""),
-          "Order": totalOrders,
-          "Revenue (INR)": totalRevenue,
-          "Accepted Items": acceptedItems,
-          "Rejected Items": rejectedItems,
-        };
-      });
+      const rows = filteredChefPerformance.map((chef, idx) => ({
+        "Sr No": idx + 1,
+        "Chef Name": toTitleCase(chef.fullName || chef.name || "Chef"),
+        "Chef ID": chef.chefId || chef.id,
+        "Base Society": toTitleCase(chef.baseSociety || "Not Set"),
+        "City": toTitleCase(chef.city || ""),
+        "Area": toTitleCase(chef.area || ""),
+        "Total Orders": chef.totalOrders || 0,
+        "Revenue (INR)": chef.totalRevenue || 0,
+        "Accepted Orders": chef.acceptedOrders || 0,
+        "Accepted Items": chef.acceptedItems || 0,
+        "Rejected Orders": chef.rejectedOrders || 0,
+        "Rejected Items": chef.rejectedItems || 0,
+      }));
 
       const filterSuffix = chefPerfCity !== "all" ? `_${chefPerfCity}` : "";
       exportToExcel(rows, `Chef_Performance_Report_${selectedPeriod}${filterSuffix}`, "Chef Performance");
@@ -673,10 +865,10 @@ export function StatisticsReportsPage() {
                         <TableCell className="text-xs text-muted-foreground">{toTitleCase(s.city)}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{toTitleCase(s.area)}</TableCell>
                         <TableCell className="text-center font-bold text-primary">
-                          {Math.round((s.totalOrders || 0) * periodMultiplier)}
+                          {s.totalOrders || 0}
                         </TableCell>
                         <TableCell className="text-right font-bold text-emerald-700">
-                          {formatCurrency((s.totalRevenue || 0) * periodMultiplier)}
+                          {formatCurrency(s.totalRevenue || 0)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -823,16 +1015,16 @@ export function StatisticsReportsPage() {
                 </Button>
               </div>
 
-              {/* Table: Chef | Order | Revenue | Accepted Items | Rejected Items */}
+              {/* Table: Chef | Total Orders | Revenue | Accepted | Rejected */}
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12 text-center">#</TableHead>
                     <TableHead>Chef</TableHead>
-                    <TableHead className="text-center font-bold">Order</TableHead>
+                    <TableHead className="text-center font-bold">Total Orders</TableHead>
                     <TableHead className="text-right font-bold">Revenue</TableHead>
-                    <TableHead className="text-center font-bold">Accepted Items</TableHead>
-                    <TableHead className="text-center font-bold">Rejected Items</TableHead>
+                    <TableHead className="text-center font-bold">Accepted</TableHead>
+                    <TableHead className="text-center font-bold">Rejected</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -844,10 +1036,12 @@ export function StatisticsReportsPage() {
                     </TableRow>
                   ) : (
                     filteredChefPerformance.map((chef, idx) => {
-                      const totalOrders = Math.round((Number(chef.totalOrders || chef.ordersToday || 0)) * periodMultiplier);
-                      const totalRevenue = Math.round((Number(chef.totalRevenue || 0)) * periodMultiplier);
-                      const acceptedItems = Number(chef.acceptedItems ?? chef.acceptedOrders ?? totalOrders);
-                      const rejectedItems = Number(chef.rejectedItems ?? chef.rejectedOrders ?? chef.consecutiveTimeouts ?? 0);
+                      const totalOrders = chef.totalOrders || 0;
+                      const totalRevenue = chef.totalRevenue || 0;
+                      const acceptedOrders = chef.acceptedOrders || 0;
+                      const rejectedOrders = chef.rejectedOrders || 0;
+                      const acceptedItems = chef.acceptedItems || 0;
+                      const rejectedItems = chef.rejectedItems || 0;
 
                       return (
                         <TableRow key={chef.id}>
@@ -875,20 +1069,30 @@ export function StatisticsReportsPage() {
                             {formatCurrency(totalRevenue)}
                           </TableCell>
                           <TableCell className="text-center">
-                            <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full text-xs">
-                              <CheckCircle2 className="size-3 text-emerald-600" />
-                              <span>{acceptedItems}</span>
-                            </span>
+                            <div className="flex flex-col items-center">
+                              <span className="inline-flex items-center gap-1 font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full text-xs">
+                                <CheckCircle2 className="size-3 text-emerald-600" />
+                                <span>{acceptedOrders} {acceptedOrders === 1 ? "Order" : "Orders"}</span>
+                              </span>
+                              <span className="text-[10px] text-muted-foreground mt-0.5">
+                                ({acceptedItems} {acceptedItems === 1 ? "dish" : "dishes"})
+                              </span>
+                            </div>
                           </TableCell>
                           <TableCell className="text-center">
-                            <span className={`inline-flex items-center gap-1 font-semibold px-2.5 py-0.5 rounded-full text-xs ${
-                              rejectedItems > 0
-                                ? "text-rose-700 bg-rose-50 border border-rose-200"
-                                : "text-muted-foreground bg-muted border border-border"
-                            }`}>
-                              <XCircle className={`size-3 ${rejectedItems > 0 ? "text-rose-600" : "text-muted-foreground"}`} />
-                              <span>{rejectedItems}</span>
-                            </span>
+                            <div className="flex flex-col items-center">
+                              <span className={`inline-flex items-center gap-1 font-semibold px-2 py-0.5 rounded-full text-xs ${
+                                rejectedOrders > 0
+                                  ? "text-rose-700 bg-rose-50 border border-rose-200"
+                                  : "text-muted-foreground bg-muted border border-border"
+                              }`}>
+                                <XCircle className={`size-3 ${rejectedOrders > 0 ? "text-rose-600" : "text-muted-foreground"}`} />
+                                <span>{rejectedOrders} {rejectedOrders === 1 ? "Order" : "Orders"}</span>
+                              </span>
+                              <span className="text-[10px] text-muted-foreground mt-0.5">
+                                ({rejectedItems} {rejectedItems === 1 ? "dish" : "dishes"})
+                              </span>
+                            </div>
                           </TableCell>
                         </TableRow>
                       );

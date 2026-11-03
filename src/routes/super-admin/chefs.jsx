@@ -140,7 +140,19 @@ function formatChefAddress(chef) {
   if (chef.area) parts.push(toTitleCase(chef.area));
   if (chef.city) parts.push(toTitleCase(chef.city));
   if (parts.length >= 2) return parts.join(", ");
-  return chef.address || "—";
+  if (typeof chef.address === "string" && chef.address.trim()) return chef.address;
+  if (typeof chef.address === "object" && chef.address !== null) {
+    const addrParts = [
+      chef.address.flatNumber ? `Flat ${chef.address.flatNumber}` : "",
+      chef.address.floor ? `Floor ${chef.address.floor}` : "",
+      chef.address.wing ? `Wing ${chef.address.wing}` : "",
+      chef.address.societyName || chef.address.society || "",
+      chef.address.area || "",
+      chef.address.city || "",
+    ].filter(Boolean);
+    if (addrParts.length > 0) return addrParts.join(", ");
+  }
+  return "—";
 }
 
 export function ChefManagementPage() {
@@ -194,10 +206,22 @@ export function ChefManagementPage() {
     });
   }, [societiesList, selectedCity, selectedArea]);
 
-  // Delivering Society dropdown options derived strictly from activeDeliverableSocieties
-  // of the chefs matching the selected City, Area, and Base Society filters (based on chef's home location)
+  // Delivering Society dropdown options derived from societies in the selected City/Area
+  // and active deliverable societies of the matching chefs
   const availableDeliveringSocieties = useMemo(() => {
-    const matchingChefs = chefs.filter((c) => {
+    const societySet = new Set();
+
+    // 1. Include societies physically located in the selected City & Area
+    societiesList.forEach((s) => {
+      const matchCity = selectedCity === "all" || String(s.city || "").toLowerCase() === selectedCity.toLowerCase();
+      const matchArea = selectedArea === "all" || String(s.area || "").toLowerCase() === selectedArea.toLowerCase();
+      if (matchCity && matchArea && s.name) {
+        societySet.add(s.name);
+      }
+    });
+
+    // 2. Also include any societies matching chefs actively deliver to
+    chefs.forEach((c) => {
       const baseSoc = societiesList.find(
         (s) =>
           (s.name && (c.baseSociety || "").toLowerCase() === s.name.toLowerCase()) ||
@@ -205,39 +229,25 @@ export function ChefManagementPage() {
       );
       const chefCity = (c.city || baseSoc?.city || "").toLowerCase();
       const chefArea = (c.area || baseSoc?.area || "").toLowerCase();
-      const cAddr = String(c.address || "").toLowerCase();
-
       const targetCity = selectedCity.toLowerCase();
-      const matchesCity =
-        selectedCity === "all" ||
-        chefCity === targetCity ||
-        (!chefCity && cAddr.includes(targetCity));
-
       const targetArea = selectedArea.toLowerCase();
-      const matchesArea =
-        selectedArea === "all" ||
-        chefArea === targetArea ||
-        (!chefArea && cAddr.includes(targetArea));
 
-      const matchesBaseSociety =
-        selectedBaseSociety === "all" ||
-        String(c.baseSociety || "").toLowerCase() === selectedBaseSociety.toLowerCase();
+      const matchCity = selectedCity === "all" || chefCity === targetCity;
+      const matchArea = selectedArea === "all" || chefArea === targetArea;
+      const matchBase = selectedBaseSociety === "all" || String(c.baseSociety || "").toLowerCase() === selectedBaseSociety.toLowerCase();
 
-      return matchesCity && matchesArea && matchesBaseSociety;
-    });
-
-    const societySet = new Set();
-    matchingChefs.forEach((c) => {
-      const activeList = Array.isArray(c.activeDeliverableSocieties) ? c.activeDeliverableSocieties : [];
-      activeList.forEach((item) => {
-        if (!item || typeof item !== "string") return;
-        const matchedSoc = societiesList.find((s) => s.id === item || s.name === item);
-        if (matchedSoc && matchedSoc.name) {
-          societySet.add(matchedSoc.name);
-        } else if (!item.toLowerCase().startsWith("soc_")) {
-          societySet.add(item);
-        }
-      });
+      if (matchCity && matchArea && matchBase) {
+        const activeList = Array.isArray(c.activeDeliverableSocieties) ? c.activeDeliverableSocieties : [];
+        activeList.forEach((item) => {
+          if (!item || typeof item !== "string") return;
+          const matchedSoc = societiesList.find((s) => s.id === item || s.name === item);
+          if (matchedSoc && matchedSoc.name) {
+            societySet.add(matchedSoc.name);
+          } else if (!item.toLowerCase().startsWith("soc_")) {
+            societySet.add(item);
+          }
+        });
+      }
     });
 
     return Array.from(societySet).sort((a, b) => a.localeCompare(b));
@@ -696,11 +706,11 @@ export function ChefManagementPage() {
     }
   };
 
-  const handleToggleAdminDeactivation = async (chefId) => {
+  const handleToggleAdminDeactivation = async (chefId, explicitDeactivate) => {
     const target = chefs.find((c) => c.id === chefId);
     if (!target) return;
 
-    const deactivate = !target.isDeactivatedByAdmin;
+    const deactivate = explicitDeactivate !== undefined ? explicitDeactivate : !target.isDeactivatedByAdmin;
 
     // Optimistic UI update: when deactivating, isActive MUST become false!
     setChefs((prev) =>
@@ -940,27 +950,6 @@ export function ChefManagementPage() {
         (statusFilter === "enabled" && !c.isDeactivatedByAdmin) ||
         (statusFilter === "disabled" && c.isDeactivatedByAdmin);
 
-      // Check City & Area match (strictly based on chef's home location / baseSociety)
-      const baseSoc = societiesList.find(
-        (s) =>
-          (s.name && (c.baseSociety || "").toLowerCase() === s.name.toLowerCase()) ||
-          (s.id && c.baseSociety === s.id)
-      );
-      const chefCity = (c.city || baseSoc?.city || "").toLowerCase();
-      const chefArea = (c.area || baseSoc?.area || "").toLowerCase();
-
-      const targetCity = selectedCity.toLowerCase();
-      const matchesCity =
-        selectedCity === "all" ||
-        chefCity === targetCity ||
-        (!chefCity && cAddr.includes(targetCity));
-
-      const targetArea = selectedArea.toLowerCase();
-      const matchesArea =
-        selectedArea === "all" ||
-        chefArea === targetArea ||
-        (!chefArea && cAddr.includes(targetArea));
-
       // Check Base Society match
       const matchesBaseSociety =
         selectedBaseSociety === "all" ||
@@ -977,6 +966,50 @@ export function ChefManagementPage() {
           const matchedSoc = societiesList.find((s) => s.id === ds || s.name === ds);
           return matchedSoc && matchedSoc.name.toLowerCase() === targetLower;
         });
+
+      // Check City & Area match:
+      // If a Delivering Society is selected and the chef delivers to it, that delivering society's
+      // location satisfies the filter. Otherwise, the chef's home base society location is verified.
+      const baseSoc = societiesList.find(
+        (s) =>
+          (s.name && (c.baseSociety || "").toLowerCase() === s.name.toLowerCase()) ||
+          (s.id && c.baseSociety === s.id)
+      );
+      const chefCity = (c.city || baseSoc?.city || "").toLowerCase();
+      const chefArea = (c.area || baseSoc?.area || "").toLowerCase();
+
+      const targetCity = selectedCity.toLowerCase();
+      const targetArea = selectedArea.toLowerCase();
+
+      let matchesCity = selectedCity === "all";
+      if (!matchesCity) {
+        if (selectedDeliveringSociety !== "all") {
+          const delivSoc = societiesList.find(
+            (s) => s.name?.toLowerCase() === selectedDeliveringSociety.toLowerCase() || s.id === selectedDeliveringSociety
+          );
+          if (delivSoc && String(delivSoc.city || "").toLowerCase() === targetCity) {
+            matchesCity = true;
+          }
+        }
+        if (!matchesCity) {
+          matchesCity = chefCity === targetCity || (!chefCity && cAddr.includes(targetCity));
+        }
+      }
+
+      let matchesArea = selectedArea === "all";
+      if (!matchesArea) {
+        if (selectedDeliveringSociety !== "all") {
+          const delivSoc = societiesList.find(
+            (s) => s.name?.toLowerCase() === selectedDeliveringSociety.toLowerCase() || s.id === selectedDeliveringSociety
+          );
+          if (delivSoc && String(delivSoc.area || "").toLowerCase() === targetArea) {
+            matchesArea = true;
+          }
+        }
+        if (!matchesArea) {
+          matchesArea = chefArea === targetArea || (!chefArea && cAddr.includes(targetArea));
+        }
+      }
 
       return matchesSearch && matchesStatus && matchesCity && matchesArea && matchesBaseSociety && matchesDeliveringSociety;
     });
@@ -1363,21 +1396,17 @@ export function ChefManagementPage() {
                     </span>
                   </TableCell>
                   <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center justify-center gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleToggleAdminDeactivation(chef.id)}
-                        title={chef.isDeactivatedByAdmin ? "Re-enable Chef" : "Deactivate Chef (Block Access)"}
+                    <div className="flex items-center justify-center gap-1.5">
+                      <div
+                        title={chef.isDeactivatedByAdmin ? "Chef Disabled (Click to Enable)" : "Chef Enabled (Click to Disable)"}
+                        className="flex items-center pr-1"
                       >
-                        <Shield
-                          className={`size-4 ${
-                            chef.isDeactivatedByAdmin
-                              ? "text-rose-500 hover:text-rose-600"
-                              : "text-emerald-600 hover:text-emerald-700"
-                          }`}
+                        <Switch
+                          checked={!chef.isDeactivatedByAdmin}
+                          onCheckedChange={(checked) => handleToggleAdminDeactivation(chef.id, !checked)}
+                          className="data-[state=checked]:bg-emerald-600 cursor-pointer scale-90"
                         />
-                      </Button>
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"

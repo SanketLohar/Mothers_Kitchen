@@ -355,10 +355,10 @@ export function MarketingPage() {
                               onCheckedChange={() => handleToggleCustomer(c.id)}
                             />
                           </TableCell>
-                          <TableCell className="font-semibold">{c.name}</TableCell>
-                          <TableCell className="font-mono">{c.mobileNumber}</TableCell>
-                          <TableCell className="text-muted-foreground truncate max-w-[140px]" title={c.address}>
-                            {c.address}
+                          <TableCell className="font-semibold">{toTitleCase(c.name || c.fullName || "Resident")}</TableCell>
+                          <TableCell className="font-mono">{c.mobileNumber || c.mobile || "—"}</TableCell>
+                          <TableCell className="text-muted-foreground truncate max-w-[140px]" title={typeof c.address === "string" ? c.address : ""}>
+                            {typeof c.address === "string" ? c.address : "—"}
                           </TableCell>
                         </TableRow>
                       ))
