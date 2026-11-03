@@ -223,14 +223,27 @@ export function StatisticsReportsPage() {
     return Array.from(new Set(list.map((s) => s.name).filter(Boolean))).sort();
   }, [societies, chefPerfCity, chefPerfArea]);
 
-  // 1. Filtered data for Report 1: Chef / Customer Count per Society
+  // 1. Filtered data for Report 1: Chef / Customer Count per Society (based strictly on chef baseSociety)
   const filteredChefCustomerSocieties = useMemo(() => {
-    return societies.filter((s) => {
-      const matchCity = chefCustCity === "all" || String(s.city || "").toLowerCase() === chefCustCity.toLowerCase();
-      const matchArea = chefCustArea === "all" || String(s.area || "").toLowerCase() === chefCustArea.toLowerCase();
-      return matchCity && matchArea;
-    });
-  }, [societies, chefCustCity, chefCustArea]);
+    return societies
+      .filter((s) => {
+        const matchCity = chefCustCity === "all" || String(s.city || "").toLowerCase() === chefCustCity.toLowerCase();
+        const matchArea = chefCustArea === "all" || String(s.area || "").toLowerCase() === chefCustArea.toLowerCase();
+        return matchCity && matchArea;
+      })
+      .map((s) => {
+        const socName = (s.name || "").trim().toLowerCase();
+        const socId = (s.id || "").trim().toLowerCase();
+        const baseChefs = chefs.filter((c) => {
+          const base = (c.baseSociety || "").trim().toLowerCase();
+          return base && (base === socName || base === socId);
+        });
+        return {
+          ...s,
+          totalChefs: baseChefs.length,
+        };
+      });
+  }, [societies, chefs, chefCustCity, chefCustArea]);
 
   // 2. Filtered data for Report 2: Orders / Revenue per Society (derived from DB orders)
   const filteredOrdersRevenueSocieties = useMemo(() => {

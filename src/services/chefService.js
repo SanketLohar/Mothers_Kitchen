@@ -513,15 +513,10 @@ export async function syncExistingChefsToSocieties() {
       const socName = socData.name;
       const socId = socDoc.id;
 
-      // Find chefs assigned to this society
+      // Find chefs who have this society as their base society
       const matchingChefs = chefs.filter((c) => {
-        const assigned = Array.isArray(c.assignedSocieties) ? c.assignedSocieties : [];
-        return (
-          assigned.includes(socName) ||
-          assigned.includes(socId) ||
-          c.baseSociety === socName ||
-          c.baseSociety === socId
-        );
+        const base = (c.baseSociety || "").trim().toLowerCase();
+        return base && (base === (socName || "").toLowerCase() || base === (socId || "").toLowerCase());
       });
 
       // Write each matching chef into subcollection

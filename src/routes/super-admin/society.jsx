@@ -118,20 +118,16 @@ export function SocietyManagementPage() {
 
   const getChefsForSociety = (soc) => {
     if (!soc) return [];
+    const socName = (soc.name || "").trim().toLowerCase();
+    const socId = (soc.id || "").trim().toLowerCase();
     return chefs.filter((c) => {
-      const assigned = Array.isArray(c.assignedSocieties) ? c.assignedSocieties : [];
-      return (
-        assigned.includes(soc.name) ||
-        assigned.includes(soc.id) ||
-        c.baseSociety === soc.name ||
-        c.baseSociety === soc.id
-      );
+      const base = (c.baseSociety || "").trim().toLowerCase();
+      return base && (base === socName || base === socId);
     });
   };
 
   const getChefCountForSociety = (soc) => {
-    const list = getChefsForSociety(soc);
-    return Math.max(list.length, Number(soc.totalChefs || 0));
+    return getChefsForSociety(soc).length;
   };
 
   // Modal States
