@@ -5,6 +5,7 @@ import { KpiCard } from "@/components/dashboard/KpiCard";
 import {
   Building2,
   ChefHat,
+  Store,
   Users,
   ShoppingBag,
   IndianRupee,
@@ -28,6 +29,7 @@ function DashboardPage() {
   const [stats, setStats] = useState({
     totalSocieties: 0,
     totalChefs: 0,
+    totalSellers: 0,
     totalCustomers: 0,
     totalOrders: 0,
     totalRevenue: 0,
@@ -105,7 +107,7 @@ function DashboardPage() {
       </div>
 
       {/* KPI Cards Row (Live DB Counts — Sleek & Compact) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <Link to="/super-admin/society" className="group">
           <KpiCard
             title="Total Societies"
@@ -122,6 +124,15 @@ function DashboardPage() {
             icon={ChefHat}
             tone="emerald"
             subtitle="Registered home cooks"
+          />
+        </Link>
+        <Link to="/super-admin/chefs" className="group">
+          <KpiCard
+            title="Total Sellers"
+            value={stats.totalSellers}
+            icon={Store}
+            tone="purple"
+            subtitle="Marketplace sellers"
           />
         </Link>
         <Link to="/super-admin/customers" className="group">

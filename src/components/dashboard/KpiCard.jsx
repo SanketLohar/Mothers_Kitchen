@@ -22,6 +22,11 @@ const toneStyles = {
     iconBg: "bg-primary text-white",
     text: "text-primary",
   },
+  purple: {
+    bg: "bg-purple-500/10 border-purple-500/20",
+    iconBg: "bg-purple-600 text-white",
+    text: "text-purple-700",
+  },
 };
 
 export function KpiCard({ title, value, icon: Icon, tone = "primary", subtitle, trend }) {

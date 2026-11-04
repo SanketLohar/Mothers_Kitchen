@@ -4,6 +4,7 @@ import { db, isFirebaseConfigured } from "@/lib/firebase";
 const EMPTY_STATS = {
   totalSocieties: 0,
   totalChefs: 0,
+  totalSellers: 0,
   totalCustomers: 0,
   totalOrders: 0,
   totalRevenue: 0,
@@ -31,11 +32,31 @@ export function subscribeToDashboardKpis(callback) {
       }, () => {})
     );
 
-    // 2. Chefs Count
+    // 2. Users Count (Chefs & Sellers from 'users' collection)
     unsubs.push(
-      onSnapshot(collection(db, "chefs"), (snap) => {
-        stats.totalChefs = snap.size;
-        callback({ ...stats });
+      onSnapshot(collection(db, "users"), (snap) => {
+        if (!snap.empty) {
+          let chefsCount = 0;
+          let sellersCount = 0;
+          snap.forEach((doc) => {
+            const d = doc.data();
+            if (d.role === "seller" || doc.id.startsWith("SELLER_")) {
+              sellersCount++;
+            } else {
+              chefsCount++;
+            }
+          });
+          stats.totalChefs = chefsCount;
+          stats.totalSellers = sellersCount;
+          callback({ ...stats });
+        } else {
+          // Fallback to legacy chefs collection if users is empty
+          onSnapshot(collection(db, "chefs"), (legacySnap) => {
+            stats.totalChefs = legacySnap.size;
+            stats.totalSellers = 0;
+            callback({ ...stats });
+          }, () => {});
+        }
       }, () => {})
     );
 
