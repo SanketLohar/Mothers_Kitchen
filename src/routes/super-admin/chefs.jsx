@@ -89,7 +89,7 @@ export const Route = createFileRoute("/super-admin/chefs")({
   component: ChefManagementPage,
 });
 
-function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs", onClick, className = "" }) {
+function ChefAvatar({ photoUrl, name, role = "chef", size = "size-11", textSize = "text-xs", onClick, className = "" }) {
   const [hasError, setHasError] = useState(false);
   const initials = (name || "C")
     .split(/\s+/)
@@ -110,7 +110,7 @@ function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs", on
     return (
       <img
         src={photoUrl.trim()}
-        alt={name || "Chef"}
+        alt={name || (role === "marketplace" ? "Partner" : "Chef")}
         onClick={onClick}
         className={`${size} rounded-full object-cover border border-border bg-muted ${onClick ? "cursor-pointer" : ""} ${className}`}
         onError={() => setHasError(true)}
@@ -123,7 +123,7 @@ function ChefAvatar({ photoUrl, name, size = "size-11", textSize = "text-xs", on
       onClick={onClick}
       className={`${size} rounded-full border border-primary/25 bg-primary/10 text-primary font-bold ${textSize} flex items-center justify-center shrink-0 uppercase tracking-wider select-none shadow-2xs ${onClick ? "cursor-pointer" : ""} ${className}`}
     >
-      {initials || <ChefHat className="size-4" />}
+      {initials || (role === "marketplace" ? <Store className="size-4" /> : <ChefHat className="size-4" />)}
     </div>
   );
 }
@@ -706,8 +706,8 @@ export function ChefManagementPage() {
 
         toast.success(
           newActive
-            ? `Chef App Availability: isActive = true`
-            : `Chef App Availability: isActive = false (Offline)`
+            ? `${formData.role === "marketplace" ? "Partner" : "Chef"} App Availability: isActive = true`
+            : `${formData.role === "marketplace" ? "Partner" : "Chef"} App Availability: isActive = false (Offline)`
         );
       } catch (err) {
         console.error("Failed to update app availability in Firestore:", err);
@@ -762,7 +762,7 @@ export function ChefManagementPage() {
     toast.success(
       deactivate
         ? `${target.fullName} has been Admin-Deactivated. They cannot log in and are offline.`
-        : `${target.fullName} has been re-enabled by Admin. Chef can now take orders.`
+        : `${target.fullName} has been re-enabled by Admin. ${target.role === "marketplace" ? "Partner" : "Chef"} can now take orders.`
     );
   };
 
@@ -773,17 +773,17 @@ export function ChefManagementPage() {
     const chefMob = String(formData.mobileNumber || "").trim();
 
     if (!chefName || !chefMob) {
-      toast.error("Please fill in Chef Full Name and Mobile Number.");
+      toast.error(`Please fill in ${formData.role === "marketplace" ? "Partner" : "Chef"} Full Name and Mobile Number.`);
       return;
     }
 
     if (!editingChef && (!formData.photoUrl || !formData.photoUrl.trim())) {
-      toast.error("Chef photograph is mandatory for registration. Please upload a photo.");
+      toast.error(`${formData.role === "marketplace" ? "Partner" : "Chef"} photograph is mandatory for registration. Please upload a photo.`);
       return;
     }
 
     if (!formData.baseSociety) {
-      toast.error("Please select a Base Residence Society.");
+      toast.error(`Please select a Base ${formData.role === "marketplace" ? "Operating" : "Residence"} Society.`);
       return;
     }
 
@@ -835,7 +835,7 @@ export function ChefManagementPage() {
                 : c
             )
           );
-          toast.success(`Chef "${payload.fullName}" profile updated in Firestore!`);
+          toast.success(`${payload.role === "marketplace" ? "Partner" : "Chef"} "${payload.fullName}" profile updated in Firestore!`);
         } else {
           setChefs((prev) =>
             prev.map((c) =>
@@ -852,12 +852,12 @@ export function ChefManagementPage() {
                 : c
             )
           );
-          toast.success(`Chef "${payload.fullName}" profile updated.`);
+          toast.success(`${payload.role === "marketplace" ? "Partner" : "Chef"} "${payload.fullName}" profile updated.`);
         }
       } else {
         if (isFirebaseConfigured) {
           const created = await createChef(payload);
-          toast.success(`Chef "${payload.fullName}" registered successfully with ID ${created.id}!`);
+          toast.success(`${payload.role === "marketplace" ? "Marketplace Partner" : "Chef"} "${payload.fullName}" registered successfully with ID ${created.id}!`);
         } else {
           const cleanM = chefMob.replace(/\D/g, "");
           const newChef = {
@@ -869,14 +869,14 @@ export function ChefManagementPage() {
           };
           setChefs((prev) => [newChef, ...prev]);
           toast.success(
-            `Chef "${payload.fullName}" registered. Credentials: ${chefMob} / ${formData.defaultPassword}`
+            `${payload.role === "marketplace" ? "Marketplace Partner" : "Chef"} "${payload.fullName}" registered. Credentials: ${chefMob} / ${formData.defaultPassword}`
           );
         }
       }
       handleCloseModal();
     } catch (err) {
       console.error("Save chef error:", err);
-      toast.error("Failed to save chef: " + (err.message || "Unknown error"));
+      toast.error(`Failed to save ${formData.role === "marketplace" ? "partner" : "chef"}: ` + (err.message || "Unknown error"));
     } finally {
       setIsSubmitting(false);
     }
@@ -895,14 +895,14 @@ export function ChefManagementPage() {
       }
     }
 
-    toast.success(`Chef "${target?.fullName || ""}" deleted.`);
+    toast.success(`${target?.role === "marketplace" ? "Marketplace Partner" : "Chef"} "${target?.fullName || ""}" deleted.`);
     setDeleteChefId(null);
   };
 
   // SheetJS Genuine Excel (.xlsx) Export
   const handleExportExcel = () => {
     if (!filteredChefs.length) {
-      toast.error("No chef records match the active filter criteria.");
+      toast.error(`No ${activeRoleTab === "marketplace" ? "marketplace partner" : "chef"} records match the active filter criteria.`);
       return;
     }
 
@@ -938,7 +938,7 @@ export function ChefManagementPage() {
   const filteredChefs = useMemo(() => {
     return chefs.map((c) => ({
       ...c,
-      fullName: toTitleCase(c.fullName || c.name || "Chef"),
+      fullName: toTitleCase(c.fullName || c.name || (c.role === "marketplace" ? "Partner" : "Chef")),
       baseSociety: toTitleCase(c.baseSociety || ""),
     })).filter((c) => {
       const query = String(searchQuery || "").toLowerCase().trim();
@@ -1151,7 +1151,7 @@ export function ChefManagementPage() {
                 <div className="flex items-center justify-between pb-1 border-b border-border">
                   <div className="flex items-center gap-2 font-bold text-foreground text-sm">
                     <Filter className="size-4 text-primary" />
-                    <span>Filter Chefs</span>
+                    <span>Filter {activeRoleTab === "marketplace" ? "Marketplace Partners" : "Chefs"}</span>
                   </div>
                   {activeFilterCount > 0 && (
                     <button
@@ -1294,7 +1294,7 @@ export function ChefManagementPage() {
                 {/* Matched Count & Apply Button */}
                 <div className="pt-2 flex items-center justify-between border-t border-border">
                   <span className="text-xs text-muted-foreground font-medium">
-                    {filteredChefs.length} {filteredChefs.length === 1 ? "chef" : "chefs"} matched
+                    {filteredChefs.length} {filteredChefs.length === 1 ? (activeRoleTab === "marketplace" ? "partner" : "chef") : (activeRoleTab === "marketplace" ? "partners" : "chefs")} matched
                   </span>
                   <Button
                     size="sm"
@@ -1362,7 +1362,7 @@ export function ChefManagementPage() {
                             setPreviewImage({
                               url: chef.photoUrl,
                               title: toTitleCase(chef.fullName),
-                              subtitle: `Chef ID: ${chef.id} • ${toTitleCase(chef.baseSociety || "")}`
+                              subtitle: `${chef.role === "marketplace" ? "Partner" : "Chef"} ID: ${chef.id} • ${toTitleCase(chef.baseSociety || "")}`
                             });
                           }
                         }}
@@ -1371,6 +1371,7 @@ export function ChefManagementPage() {
                         <ChefAvatar
                           photoUrl={chef.photoUrl}
                           name={chef.fullName}
+                          role={chef.role}
                           size="size-11"
                         />
                         {/* Live Avatar Presence Badge */}
@@ -1380,10 +1381,10 @@ export function ChefManagementPage() {
                           }`}
                           title={
                             chef.isActive
-                              ? "Chef is Active (Taking orders on app)"
+                              ? `${chef.role === "marketplace" ? "Partner" : "Chef"} is Active (Taking orders on app)`
                               : chef.isDeactivatedByAdmin
-                              ? "Chef is Deactivated by Admin"
-                              : "Chef is Offline on app"
+                              ? `${chef.role === "marketplace" ? "Partner" : "Chef"} is Deactivated by Admin`
+                              : `${chef.role === "marketplace" ? "Partner" : "Chef"} is Offline on app`
                           }
                         />
                       </div>
@@ -1442,7 +1443,8 @@ export function ChefManagementPage() {
                             className="text-muted-foreground hover:text-primary transition-colors p-0.5"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const cred = `Chef Login:\nMobile: ${chef.mobileNumber}\nPassword: ${chef.defaultPassword || chef.password}`;
+                              const roleTitle = chef.role === "marketplace" ? "Partner" : "Chef";
+                              const cred = `${roleTitle} Login:\nMobile: ${chef.mobileNumber}\nPassword: ${chef.defaultPassword || chef.password}`;
                               navigator.clipboard.writeText(cred);
                               toast.success("Credentials copied for WhatsApp!");
                             }}
@@ -1461,7 +1463,7 @@ export function ChefManagementPage() {
                   <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1.5">
                       <div
-                        title={chef.isDeactivatedByAdmin ? "Chef Disabled (Click to Enable)" : "Chef Enabled (Click to Disable)"}
+                        title={chef.isDeactivatedByAdmin ? `${chef.role === "marketplace" ? "Partner" : "Chef"} Disabled (Click to Enable)` : `${chef.role === "marketplace" ? "Partner" : "Chef"} Enabled (Click to Disable)`}
                         className="flex items-center pr-1"
                       >
                         <Switch
@@ -1482,7 +1484,7 @@ export function ChefManagementPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleOpenEditModal(chef)}
-                        title="Edit chef"
+                        title={chef.role === "marketplace" ? "Edit partner" : "Edit chef"}
                       >
                         <Edit2 className="size-4 text-muted-foreground hover:text-primary" />
                       </Button>
@@ -1490,7 +1492,7 @@ export function ChefManagementPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => setDeleteChefId(chef.id)}
-                        title="Delete chef"
+                        title={chef.role === "marketplace" ? "Delete partner" : "Delete chef"}
                       >
                         <Trash2 className="size-4 text-muted-foreground hover:text-destructive" />
                       </Button>
@@ -1682,7 +1684,9 @@ export function ChefManagementPage() {
             {/* Photo Upload Option with Live Preview (Mandatory) */}
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold">Chef Photograph *</Label>
+                <Label className="text-xs font-semibold">
+                  {formData.role === "marketplace" ? "Partner / Store Photograph *" : "Chef Photograph *"}
+                </Label>
                 <span className="text-[10px] text-destructive font-bold uppercase tracking-wider">
                   Mandatory for Registration
                 </span>
@@ -1698,11 +1702,15 @@ export function ChefManagementPage() {
                   {formData.photoUrl && formData.photoUrl.trim() ? (
                     <img
                       src={formData.photoUrl}
-                      alt="Chef Preview"
+                      alt={formData.role === "marketplace" ? "Partner Preview" : "Chef Preview"}
                       className="size-full object-cover"
                     />
                   ) : (
-                    <ChefHat className="size-6 text-muted-foreground/60" />
+                    formData.role === "marketplace" ? (
+                      <Store className="size-6 text-muted-foreground/60" />
+                    ) : (
+                      <ChefHat className="size-6 text-muted-foreground/60" />
+                    )
                   )}
                 </div>
                 <div className="flex-1 space-y-1">
@@ -1796,14 +1804,16 @@ export function ChefManagementPage() {
               {/* Base Society & Separate Flat Number / Floor / Wing/Building Fields */}
               <div className="space-y-3">
                 <div className="space-y-1">
-                  <Label className="text-xs font-semibold">Base Residence Society *</Label>
+                  <Label className="text-xs font-semibold">
+                    {formData.role === "marketplace" ? "Base Operating Society *" : "Base Residence Society *"}
+                  </Label>
                   <Select
                     value={formData.baseSociety || undefined}
                     onValueChange={(val) => handleFormSocietyChange(val)}
                     disabled={!formData.area}
                   >
                     <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">
-                      <SelectValue placeholder={formData.area ? "Select Base Society" : "Select Area First"} />
+                      <SelectValue placeholder={formData.area ? `Select Base ${formData.role === "marketplace" ? "Operating" : "Residence"} Society` : "Select Area First"} />
                     </SelectTrigger>
                     <SelectContent>
                       {formAvailableSocieties.map((soc, idx) => (
@@ -1901,7 +1911,7 @@ export function ChefManagementPage() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Filter by City & Area below to select societies where this cook is approved to deliver.
+                Filter by City & Area below to select societies where this {formData.role === "marketplace" ? "marketplace partner" : "cook"} is approved to deliver.
               </p>
 
               {/* City and Area Filter Suggestions */}
@@ -2038,8 +2048,8 @@ export function ChefManagementPage() {
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] text-muted-foreground max-w-[180px] leading-tight">
                       {formData.isDeactivatedByAdmin
-                        ? "Chef is deactivated/blocked by admin. App login blocked and offline."
-                        : "Chef account is active and allowed to take orders."}
+                        ? `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} is deactivated/blocked by admin. App login blocked and offline.`
+                        : `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} account is active and allowed to take orders.`}
                     </span>
                     <Switch
                       checked={!formData.isDeactivatedByAdmin}
@@ -2051,7 +2061,9 @@ export function ChefManagementPage() {
                 {/* 2. Active App Status Toggle */}
                 <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-foreground">Chef App Availability</Label>
+                    <Label className="text-xs font-bold text-foreground">
+                      {formData.role === "marketplace" ? "Partner" : "Chef"} App Availability
+                    </Label>
                     <Badge
                       variant={!formData.isDeactivatedByAdmin && formData.isActive ? "success" : "secondary"}
                       className={`text-[10px] gap-1 ${!formData.isDeactivatedByAdmin && formData.isActive ? "bg-emerald-500/15 text-emerald-800 border-emerald-300" : ""}`}
@@ -2067,10 +2079,10 @@ export function ChefManagementPage() {
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] text-muted-foreground max-w-[180px] leading-tight">
                       {formData.isDeactivatedByAdmin
-                        ? "Chef is deactivated by admin. Cannot be active on app."
+                        ? `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} is deactivated by admin. Cannot be active on app.`
                         : formData.isActive
-                        ? "Chef is active and taking orders on customer app."
-                        : "Chef is offline and unavailable for orders."}
+                        ? `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} is active and taking orders on customer app.`
+                        : `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} is offline and unavailable for orders.`}
                     </span>
                     <Switch
                       checked={!formData.isDeactivatedByAdmin && Boolean(formData.isActive)}
@@ -2091,7 +2103,7 @@ export function ChefManagementPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider">
                       <Lock className="size-3.5" />
-                      <span>Chef Mobile App Login Credentials</span>
+                      <span>{formData.role === "marketplace" ? "Marketplace Partner" : "Chef"} Mobile App Login Credentials</span>
                     </div>
                     <Badge variant="outline" className="text-[10px] bg-background font-semibold">
                       Mobile Login
@@ -2101,7 +2113,7 @@ export function ChefManagementPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs">Chef Mobile Login ID</Label>
+                        <Label className="text-xs">{formData.role === "marketplace" ? "Partner" : "Chef"} Mobile Login ID</Label>
                         <span className="text-[10px] text-primary font-semibold">
                           Mobile Number
                         </span>
@@ -2112,7 +2124,7 @@ export function ChefManagementPage() {
                         className="text-xs bg-muted font-mono font-semibold"
                       />
                       <span className="text-[10px] text-muted-foreground block">
-                        Chef logs into mobile app directly using their registered Mobile Number.
+                        {formData.role === "marketplace" ? "Partner" : "Chef"} logs into mobile app directly using their registered Mobile Number.
                       </span>
                     </div>
                     <div className="space-y-1">
@@ -2125,7 +2137,7 @@ export function ChefManagementPage() {
                         required={!editingChef}
                       />
                       <span className="text-[10px] text-muted-foreground block">
-                        Chef enters this in the mobile app.
+                        {formData.role === "marketplace" ? "Partner" : "Chef"} enters this in the mobile app.
                       </span>
                     </div>
                   </div>
@@ -2133,10 +2145,10 @@ export function ChefManagementPage() {
                   <div className="rounded-lg bg-background/80 border p-2 text-[11px] text-muted-foreground space-y-1">
                     <div className="font-semibold text-foreground flex items-center gap-1.5">
                       <Shield className="size-3 text-primary" />
-                      Chef Mobile Login Flow:
+                      {formData.role === "marketplace" ? "Partner" : "Chef"} Mobile Login Flow:
                     </div>
                     <p>
-                      The chef logs in directly using their registered <strong>Mobile Number</strong> and this <strong>Password</strong>.
+                      The {formData.role === "marketplace" ? "marketplace partner" : "chef"} logs in directly using their registered <strong>Mobile Number</strong> and this <strong>Password</strong>.
                       The Super Admin session remains 100% active while credentials are saved in Firestore and provisioned in Firebase Auth.
                     </p>
                   </div>
@@ -2157,10 +2169,10 @@ export function ChefManagementPage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="size-4 animate-spin mr-2" />
-                    {editingChef ? "Saving Profile..." : "Registering Chef..."}
+                    {editingChef ? "Saving Profile..." : (formData.role === "marketplace" ? "Registering Partner..." : "Registering Chef...")}
                   </>
                 ) : (
-                  editingChef ? "Save Profile" : "Register Chef"
+                  editingChef ? "Save Profile" : (formData.role === "marketplace" ? "Register Marketplace Partner" : "Register Chef")
                 )}
               </Button>
             </DialogFooter>
@@ -2174,10 +2186,12 @@ export function ChefManagementPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="size-5" />
-              <span>Delete Chef?</span>
+              <span>
+                Delete {chefs.find((c) => c.id === deleteChefId)?.role === "marketplace" ? "Marketplace Partner" : "Chef"}?
+              </span>
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this chef? Their listed items will be removed from all associated societies.
+              Are you sure you want to delete this {chefs.find((c) => c.id === deleteChefId)?.role === "marketplace" ? "marketplace partner" : "chef"}? Their listed items will be removed from all associated societies.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2201,7 +2215,7 @@ export function ChefManagementPage() {
                     setPreviewImage({
                       url: activeViewingChef.photoUrl,
                       title: toTitleCase(activeViewingChef.fullName),
-                      subtitle: `Chef ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
+                      subtitle: `${activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
                     });
                   }
                 }}
@@ -2210,6 +2224,7 @@ export function ChefManagementPage() {
                 <ChefAvatar
                   photoUrl={activeViewingChef?.photoUrl}
                   name={activeViewingChef?.fullName}
+                  role={activeViewingChef?.role}
                   size="size-14"
                   textSize="text-base"
                   className="ring-2 ring-primary/25 group-hover:ring-primary group-hover:scale-105 transition-all shadow-md"
@@ -2237,7 +2252,7 @@ export function ChefManagementPage() {
                       setPreviewImage({
                         url: activeViewingChef.photoUrl,
                         title: toTitleCase(activeViewingChef.fullName),
-                        subtitle: `Chef ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
+                        subtitle: `${activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
                       });
                     }}
                     className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 mt-1 cursor-pointer"
@@ -2255,7 +2270,7 @@ export function ChefManagementPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                   <Lock className="size-3.5" />
-                  <span>Chef Mobile App Credentials</span>
+                  <span>{activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} Mobile App Credentials</span>
                 </div>
                 <Button
                   type="button"
@@ -2263,7 +2278,8 @@ export function ChefManagementPage() {
                   variant="outline"
                   className="h-7 text-xs gap-1"
                   onClick={() => {
-                    const text = `Hello ${activeViewingChef?.fullName || "Chef"}! Welcome to Mother's Kitchen.\n\nYour Chef Mobile App Login:\n• Mobile Number: ${activeViewingChef?.mobileNumber}\n• Password: ${activeViewingChef?.defaultPassword || activeViewingChef?.password || "—"}\n\nPlease keep your credentials safe.`;
+                    const roleName = activeViewingChef?.role === "marketplace" ? "Partner" : "Chef";
+                    const text = `Hello ${activeViewingChef?.fullName || roleName}! Welcome to Mother's Kitchen.\n\nYour ${roleName} Mobile App Login:\n• Mobile Number: ${activeViewingChef?.mobileNumber}\n• Password: ${activeViewingChef?.defaultPassword || activeViewingChef?.password || "—"}\n\nPlease keep your credentials safe.`;
                     navigator.clipboard.writeText(text);
                     toast.success("Login details copied for WhatsApp!");
                   }}
@@ -2328,7 +2344,9 @@ export function ChefManagementPage() {
             </div>
             {(activeViewingChef?.flatNumber || activeViewingChef?.wing || activeViewingChef?.floor) && (
               <div className="flex justify-between border-b pb-2">
-                <span className="text-muted-foreground">Residence Flat / Wing:</span>
+                <span className="text-muted-foreground">
+                  {activeViewingChef?.role === "marketplace" ? "Store / Operating Unit:" : "Residence Flat / Wing:"}
+                </span>
                 <span className="font-semibold text-right">
                   {activeViewingChef?.flatNumber ? `Flat ${activeViewingChef.flatNumber}` : ""}
                   {activeViewingChef?.wing ? `, Wing ${toTitleCase(activeViewingChef.wing)}` : ""}
@@ -2367,14 +2385,14 @@ export function ChefManagementPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>Chef Active Deliverable Societies ({activeViewingChef?.activeDeliverableSocieties?.length || 0}):</span>
+                  <span>{activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} Active Deliverable Societies ({activeViewingChef?.activeDeliverableSocieties?.length || 0}):</span>
                 </span>
                 <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                  Live on Chef App
+                  Live on {activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} App
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Societies where this chef is actively delivering (chosen &amp; toggled by the chef on mobile app).
+                Societies where this {activeViewingChef?.role === "marketplace" ? "partner" : "chef"} is actively delivering (chosen &amp; toggled by the {activeViewingChef?.role === "marketplace" ? "partner" : "chef"} on mobile app).
               </p>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {activeViewingChef?.activeDeliverableSocieties?.length ? (
@@ -2390,7 +2408,7 @@ export function ChefManagementPage() {
                   ))
                 ) : (
                   <span className="text-xs text-muted-foreground italic">
-                    None selected (Chef has not chosen any active delivery societies on app)
+                    None selected ({activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} has not chosen any active delivery societies on app)
                   </span>
                 )}
               </div>
@@ -2426,7 +2444,7 @@ export function ChefManagementPage() {
         <DialogContent className="max-w-md p-0 overflow-hidden bg-card border border-border shadow-2xl rounded-2xl z-[130]">
           <DialogHeader className="p-4 pb-2 border-b border-border">
             <DialogTitle className="flex items-center justify-between text-base">
-              <span>{previewImage?.title || "Chef Photograph"}</span>
+              <span>{previewImage?.title || "Photograph"}</span>
             </DialogTitle>
             {previewImage?.subtitle && (
               <DialogDescription className="text-xs text-muted-foreground">
@@ -2437,7 +2455,7 @@ export function ChefManagementPage() {
           <div className="bg-zinc-950 flex items-center justify-center p-3 min-h-[280px] max-h-[65vh]">
             <img
               src={previewImage?.url}
-              alt={previewImage?.title || "Chef Photo"}
+              alt={previewImage?.title || "Photo"}
               className="max-h-[60vh] w-auto max-w-full object-contain rounded-xl shadow-lg"
             />
           </div>
@@ -2446,7 +2464,7 @@ export function ChefManagementPage() {
               href={previewImage?.url}
               target="_blank"
               rel="noopener noreferrer"
-              download={`${(previewImage?.title || "chef").toLowerCase().replace(/\s+/g, "_")}_photo.jpg`}
+              download={`${(previewImage?.title || "user").toLowerCase().replace(/\s+/g, "_")}_photo.jpg`}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-input bg-background hover:bg-muted text-xs font-semibold text-foreground transition-colors cursor-pointer"
             >
               <ExternalLink className="size-3.5" />

@@ -1,4 +1,4 @@
-import { collection, doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
+import { collection, collectionGroup, doc, onSnapshot, setDoc, serverTimestamp } from "firebase/firestore";
 import { db, isFirebaseConfigured } from "@/lib/firebase";
 
 const COLLECTION_NAME = "app_highlights";
@@ -154,3 +154,61 @@ export async function saveSocietyHighlightSlot(societyId, slotNumber, data) {
     { merge: true }
   );
 }
+
+/**
+ * Subscribes to all society highlights across all societies using a collectionGroup query.
+ * Returns a map of societyId -> array of slot objects.
+ */
+export function subscribeToAllSocietyHighlights(callback) {
+  if (!isFirebaseConfigured || !db) {
+    callback({});
+    return () => {};
+  }
+
+  const groupRef = collectionGroup(db, "highlights");
+
+  return onSnapshot(
+    groupRef,
+    (snapshot) => {
+      if (snapshot.empty) {
+        callback({});
+        return;
+      }
+
+      const map = {};
+      snapshot.docs.forEach((d) => {
+        const data = d.data();
+        const societyId = data.societyId || d.ref.parent.parent?.id;
+        if (!societyId) return;
+
+        if (!map[societyId]) {
+          map[societyId] = {};
+        }
+        map[societyId][data.slotNumber] = { id: d.id, societyId, ...data };
+      });
+
+      const resultMap = {};
+      Object.keys(map).forEach((socId) => {
+        resultMap[socId] = [1, 2, 3, 4].map((slot) => {
+          return (
+            map[socId][slot] || {
+              slotNumber: slot,
+              societyId: socId,
+              title: "",
+              subtitle: "",
+              imageUrl: "",
+              isActive: false,
+            }
+          );
+        });
+      });
+
+      callback(resultMap);
+    },
+    (err) => {
+      console.warn("All society highlights subscription error:", err);
+      callback({});
+    }
+  );
+}
+

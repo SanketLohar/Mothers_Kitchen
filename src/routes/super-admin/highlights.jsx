@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Shell } from "@/components/dashboard/Shell";
 import {
   Sparkles,
@@ -17,8 +17,6 @@ import {
   Building2,
   MapPin,
   Filter,
-  X,
-  Layers,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -28,9 +26,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
-  SelectTrigger,
+  SelectGroup,
   SelectValue,
+  SelectTrigger,
   SelectContent,
+  SelectLabel,
   SelectItem,
 } from "@/components/ui/select";
 import {
@@ -48,6 +48,7 @@ import {
   saveHighlightSlot,
   subscribeToSocietyHighlights,
   saveSocietyHighlightSlot,
+  subscribeToAllSocietyHighlights,
 } from "@/services/highlightService";
 import { subscribeToSocieties } from "@/services/societyService";
 
@@ -62,6 +63,8 @@ const EMPTY_SLOTS = [1, 2, 3, 4].map((slot) => ({
   imageUrl: "",
   isActive: false,
 }));
+
+const LOCAL_STORAGE_KEY = "mk_last_selected_society_highlights";
 
 export function HighlightsPage() {
   // Tabs: "global" | "society"
@@ -78,6 +81,10 @@ export function HighlightsPage() {
   const [selectedSocietyId, setSelectedSocietyId] = useState("");
   const [societyHighlights, setSocietyHighlights] = useState(EMPTY_SLOTS);
   const [savingSocietySlot, setSavingSocietySlot] = useState(null);
+
+  // Map of all configured society highlights across the system: { [societyId]: [slot1..4] }
+  const [configuredSocietiesMap, setConfiguredSocietiesMap] = useState({});
+  const autoSelectedRef = useRef(false);
 
   // Mobile preview carousel dialog
   const [previewCarouselOpen, setPreviewCarouselOpen] = useState(false);
@@ -115,6 +122,82 @@ export function HighlightsPage() {
     return () => unsubSocieties();
   }, []);
 
+  // Subscribe to all society highlights system-wide
+  useEffect(() => {
+    const unsubAll = subscribeToAllSocietyHighlights((map) => {
+      setConfiguredSocietiesMap(map || {});
+    });
+    return () => unsubAll();
+  }, []);
+
+  // Distinct cities from registered societies
+  const availableCities = useMemo(() => {
+    return Array.from(new Set(societiesList.map((s) => s.city).filter(Boolean))).sort();
+  }, [societiesList]);
+
+  // Distinct areas filtered by selected city
+  const availableAreas = useMemo(() => {
+    const filtered = selectedCity === "all"
+      ? societiesList
+      : societiesList.filter((s) => s.city === selectedCity);
+    return Array.from(new Set(filtered.map((s) => s.area).filter(Boolean))).sort();
+  }, [societiesList, selectedCity]);
+
+  // Societies filtered by city and area
+  const availableSocieties = useMemo(() => {
+    return societiesList
+      .filter((s) => {
+        const matchCity = selectedCity === "all" || s.city === selectedCity;
+        const matchArea = selectedArea === "all" || s.area === selectedArea;
+        return matchCity && matchArea;
+      })
+      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+  }, [societiesList, selectedCity, selectedArea]);
+
+  // Separate available societies into those with configured highlights vs others
+  const { configuredSocieties, otherSocieties } = useMemo(() => {
+    const configured = [];
+    const others = [];
+    availableSocieties.forEach((s) => {
+      const slots = configuredSocietiesMap[s.id];
+      const hasConfig = slots && slots.some((x) => x.imageUrl || x.title || x.isActive);
+      if (hasConfig) {
+        configured.push(s);
+      } else {
+        others.push(s);
+      }
+    });
+    return { configuredSocieties: configured, otherSocieties: others };
+  }, [availableSocieties, configuredSocietiesMap]);
+
+  // Currently selected society object
+  const activeSociety = useMemo(() => {
+    return societiesList.find((s) => s.id === selectedSocietyId);
+  }, [societiesList, selectedSocietyId]);
+
+  // Auto-Select Logic: Preload last viewed society or first configured society (e.g. ITPL)
+  useEffect(() => {
+    if (autoSelectedRef.current || !societiesList.length) return;
+
+    // Check localStorage first
+    const savedId = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedId && societiesList.some((s) => s.id === savedId)) {
+      handleSocietyChange(savedId);
+      autoSelectedRef.current = true;
+      return;
+    }
+
+    // Otherwise, auto-select the first configured society if available
+    const configuredIds = Object.keys(configuredSocietiesMap);
+    if (configuredIds.length > 0) {
+      const matchSoc = societiesList.find((s) => configuredIds.includes(s.id));
+      if (matchSoc) {
+        handleSocietyChange(matchSoc.id);
+        autoSelectedRef.current = true;
+      }
+    }
+  }, [societiesList, configuredSocietiesMap]);
+
   // Subscribe to selected society's highlights when chosen
   useEffect(() => {
     if (!selectedSocietyId) {
@@ -147,35 +230,6 @@ export function HighlightsPage() {
     return () => unsub();
   }, [selectedSocietyId]);
 
-  // Distinct cities from registered societies
-  const availableCities = useMemo(() => {
-    return Array.from(new Set(societiesList.map((s) => s.city).filter(Boolean))).sort();
-  }, [societiesList]);
-
-  // Distinct areas filtered by selected city
-  const availableAreas = useMemo(() => {
-    const filtered = selectedCity === "all"
-      ? societiesList
-      : societiesList.filter((s) => s.city === selectedCity);
-    return Array.from(new Set(filtered.map((s) => s.area).filter(Boolean))).sort();
-  }, [societiesList, selectedCity]);
-
-  // Societies filtered by city and area
-  const availableSocieties = useMemo(() => {
-    return societiesList
-      .filter((s) => {
-        const matchCity = selectedCity === "all" || s.city === selectedCity;
-        const matchArea = selectedArea === "all" || s.area === selectedArea;
-        return matchCity && matchArea;
-      })
-      .sort((a, b) => (a.name || "").localeCompare(b.name || ""));
-  }, [societiesList, selectedCity, selectedArea]);
-
-  // Currently selected society object
-  const activeSociety = useMemo(() => {
-    return societiesList.find((s) => s.id === selectedSocietyId);
-  }, [societiesList, selectedSocietyId]);
-
   // Cascading change handlers
   const handleCityChange = (city) => {
     setSelectedCity(city);
@@ -190,18 +244,14 @@ export function HighlightsPage() {
 
   const handleSocietyChange = (societyId) => {
     setSelectedSocietyId(societyId);
+    if (societyId) {
+      localStorage.setItem(LOCAL_STORAGE_KEY, societyId);
+    }
     const target = societiesList.find((s) => s.id === societyId);
     if (target) {
-      if (target.city && selectedCity === "all") setSelectedCity(target.city);
-      if (target.area && selectedArea === "all") setSelectedArea(target.area);
+      if (target.city) setSelectedCity(target.city);
+      if (target.area) setSelectedArea(target.area);
     }
-  };
-
-  const handleClearSocietySelection = () => {
-    setSelectedCity("all");
-    setSelectedArea("all");
-    setSelectedSocietyId("");
-    setSocietyHighlights(EMPTY_SLOTS);
   };
 
   // Compresses banner to high-quality persistent data URL (JPEG max 1080x540 ~50KB)
@@ -226,6 +276,8 @@ export function HighlightsPage() {
           canvas.width = w;
           canvas.height = h;
           const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "#FFFFFF";
+          ctx.fillRect(0, 0, w, h);
           ctx.drawImage(img, 0, 0, w, h);
           resolve(canvas.toDataURL("image/jpeg", 0.85));
         };
@@ -249,12 +301,12 @@ export function HighlightsPage() {
     if (isFirebaseConfigured) {
       try {
         await saveHighlightSlot(slotNumber, updated);
+        toast.success(`Global Slot #${slotNumber} is now ${next ? "ACTIVE" : "INACTIVE"} on Customer App.`);
       } catch (err) {
         console.error("Highlight toggle error:", err);
+        toast.error("Failed to update status: " + err.message);
       }
     }
-
-    toast.success(`Global Slot #${slotNumber} is now ${next ? "ACTIVE" : "INACTIVE"} on Customer App.`);
   };
 
   const handleSaveGlobalSlot = async (slotNumber) => {
@@ -268,7 +320,7 @@ export function HighlightsPage() {
         setHighlights((prev) =>
           prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
         );
-        toast.success(`Global Slot #${slotNumber} successfully saved to Firestore!`);
+        toast.success(`Global Slot #${slotNumber} saved to Firestore! Status: ${target.isActive ? "ACTIVE (Live on App)" : "INACTIVE"}`);
       } catch (err) {
         toast.error("Failed to save slot: " + err.message);
       } finally {
@@ -300,8 +352,8 @@ export function HighlightsPage() {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image file size exceeds the maximum limit of 10 MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Image file size exceeds the 15 MB limit.");
       return;
     }
 
@@ -310,18 +362,21 @@ export function HighlightsPage() {
       const target = highlights.find((h) => h.slotNumber === slotNumber) || { slotNumber };
       const updatedSlot = {
         ...target,
+        slotNumber,
         imageUrl: dataUrl,
+        isActive: true, // Automatically set switch to Active so user sees it will be active on save
         isDirty: true,
         updatedAt: new Date().toISOString(),
       };
 
+      // Only update local state — DO NOT save to DB until "Save Changes" is clicked!
       setHighlights((prev) =>
         prev.map((h) => (h.slotNumber === slotNumber ? updatedSlot : h))
       );
 
-      toast.info(`Image attached for Global Slot #${slotNumber}. Click "Save Banner Changes" below to save.`);
+      toast.info(`Photo selected for Slot #${slotNumber}. Click "Save Changes" below to commit to database.`);
     } catch (err) {
-      console.error("Banner processing error:", err);
+      console.error("Banner upload error:", err);
       toast.error("Failed to process image: " + err.message);
     } finally {
       e.target.value = "";
@@ -329,10 +384,12 @@ export function HighlightsPage() {
   };
 
   const handleRemoveGlobalImage = (slotNumber) => {
+    const target = highlights.find((h) => h.slotNumber === slotNumber) || { slotNumber };
+    const updated = { ...target, imageUrl: "", isDirty: true };
     setHighlights((prev) =>
-      prev.map((h) => (h.slotNumber === slotNumber ? { ...h, imageUrl: "", isDirty: true } : h))
+      prev.map((h) => (h.slotNumber === slotNumber ? updated : h))
     );
-    toast.info(`Image cleared for Global Slot #${slotNumber}. Click "Save Banner Changes" to save.`);
+    toast.info(`Photo removed for Slot #${slotNumber}. Click "Save Changes" below to save.`);
   };
 
   // --- SOCIETY SPECIFIC HIGHLIGHT HANDLERS ---
@@ -350,12 +407,12 @@ export function HighlightsPage() {
     if (isFirebaseConfigured) {
       try {
         await saveSocietyHighlightSlot(selectedSocietyId, slotNumber, updated);
+        toast.success(`Slot #${slotNumber} for "${activeSociety?.name || 'Society'}" is now ${next ? "ACTIVE" : "INACTIVE"} on Customer App.`);
       } catch (err) {
         console.error("Society highlight toggle error:", err);
+        toast.error("Failed to update status: " + err.message);
       }
     }
-
-    toast.success(`Slot #${slotNumber} for "${activeSociety?.name || 'Society'}" is now ${next ? "ACTIVE" : "INACTIVE"}.`);
   };
 
   const handleSaveSocietySlot = async (slotNumber) => {
@@ -374,7 +431,7 @@ export function HighlightsPage() {
         setSocietyHighlights((prev) =>
           prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
         );
-        toast.success(`Slot #${slotNumber} for "${activeSociety?.name}" saved to Firestore!`);
+        toast.success(`Slot #${slotNumber} for "${activeSociety?.name}" saved to Firestore! Status: ${target.isActive ? "ACTIVE (Live)" : "INACTIVE"}`);
       } catch (err) {
         toast.error("Failed to save society slot: " + err.message);
       } finally {
@@ -410,8 +467,8 @@ export function HighlightsPage() {
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image file size exceeds the maximum limit of 10 MB.");
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Image file size exceeds the 15 MB limit.");
       return;
     }
 
@@ -420,18 +477,22 @@ export function HighlightsPage() {
       const target = societyHighlights.find((h) => h.slotNumber === slotNumber) || { slotNumber };
       const updatedSlot = {
         ...target,
+        slotNumber,
+        societyId: selectedSocietyId,
         imageUrl: dataUrl,
+        isActive: true, // Automatically set switch to Active so user sees it will be active on save
         isDirty: true,
         updatedAt: new Date().toISOString(),
       };
 
+      // Only update local state — DO NOT save to DB until "Save Changes" is clicked!
       setSocietyHighlights((prev) =>
         prev.map((h) => (h.slotNumber === slotNumber ? updatedSlot : h))
       );
 
-      toast.info(`Image attached for Slot #${slotNumber}. Click "Save Banner Changes" below to save.`);
+      toast.info(`Photo selected for Slot #${slotNumber}. Click "Save Changes" below to commit to database.`);
     } catch (err) {
-      console.error("Society banner processing error:", err);
+      console.error("Society banner upload error:", err);
       toast.error("Failed to process image: " + err.message);
     } finally {
       e.target.value = "";
@@ -439,10 +500,13 @@ export function HighlightsPage() {
   };
 
   const handleRemoveSocietyImage = (slotNumber) => {
+    if (!selectedSocietyId) return;
+    const target = societyHighlights.find((h) => h.slotNumber === slotNumber) || { slotNumber };
+    const updated = { ...target, imageUrl: "", isDirty: true };
     setSocietyHighlights((prev) =>
-      prev.map((h) => (h.slotNumber === slotNumber ? { ...h, imageUrl: "", isDirty: true } : h))
+      prev.map((h) => (h.slotNumber === slotNumber ? updated : h))
     );
-    toast.info(`Image cleared for Slot #${slotNumber}. Click "Save Banner Changes" to save.`);
+    toast.info(`Photo removed for Slot #${slotNumber}. Click "Save Changes" below to save.`);
   };
 
   // Active highlights list for mobile preview based on selected scope
@@ -466,8 +530,8 @@ export function HighlightsPage() {
       }
     >
       {/* Top Scope Tabs: Global | Society Specific */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-border pb-4">
-        <div className="flex items-center gap-2 bg-muted/60 p-1 rounded-2xl border border-border/60 self-start">
+      <div className="flex items-center justify-between border-b border-border pb-4">
+        <div className="flex items-center gap-2 bg-muted/60 p-1 rounded-2xl border border-border/60">
           <button
             type="button"
             onClick={() => setActiveScopeTab("global")}
@@ -492,25 +556,8 @@ export function HighlightsPage() {
           >
             <Building2 className="size-4" />
             <span>Society Specific Highlights</span>
-            {selectedSocietyId && (
-              <Badge className="bg-emerald-600 text-white text-[10px] px-1.5 py-0">
-                1 Selected
-              </Badge>
-            )}
           </button>
         </div>
-
-        {activeScopeTab === "society" && activeSociety && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="font-semibold text-foreground">Targeting:</span>
-            <Badge variant="outline" className="font-bold text-foreground">
-              {activeSociety.name}
-            </Badge>
-            <Badge variant="secondary" className="text-[11px]">
-              {activeSociety.area}, {activeSociety.city}
-            </Badge>
-          </div>
-        )}
       </div>
 
       {/* ======================= TAB 1: GLOBAL HIGHLIGHTS ======================= */}
@@ -532,7 +579,7 @@ export function HighlightsPage() {
               </div>
             </div>
             <Badge variant="outline" className="text-[11px] font-semibold shrink-0">
-              Max File Size: 10 MB
+              Max File Size: 15 MB
             </Badge>
           </div>
 
@@ -672,30 +719,16 @@ export function HighlightsPage() {
           {/* Cascading Filter Bar: City -> Area -> Society */}
           <Card className="border-border shadow-xs bg-card/60 backdrop-blur-sm">
             <CardHeader className="p-4 pb-3 border-b border-border/60">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
-                    <Filter className="size-4" />
-                  </div>
-                  <div>
-                    <CardTitle className="text-sm font-bold">Select Target Society</CardTitle>
-                    <CardDescription className="text-xs">
-                      Pick City & Area to select the Society whose 4 highlight banners you want to configure.
-                    </CardDescription>
-                  </div>
+              <div className="flex items-center gap-2">
+                <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Filter className="size-4" />
                 </div>
-
-                {selectedSocietyId && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleClearSocietySelection}
-                    className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-foreground self-start sm:self-auto"
-                  >
-                    <X className="size-3.5" />
-                    <span>Clear Selection</span>
-                  </Button>
-                )}
+                <div>
+                  <CardTitle className="text-sm font-bold">Select Society to Manage Highlights</CardTitle>
+                  <CardDescription className="text-xs">
+                    Choose a society from the dropdown below to view, edit, or configure its 4 promotional highlight banners.
+                  </CardDescription>
+                </div>
               </div>
             </CardHeader>
 
@@ -737,7 +770,7 @@ export function HighlightsPage() {
                   </Select>
                 </div>
 
-                {/* 3. Society Dropdown */}
+                {/* 3. Target Society Dropdown */}
                 <div className="space-y-1.5">
                   <Label className="text-xs font-bold text-primary">3. Target Society *</Label>
                   <Select
@@ -753,11 +786,34 @@ export function HighlightsPage() {
                       <SelectItem value="none" disabled>
                         -- Choose Society ({availableSocieties.length} available) --
                       </SelectItem>
-                      {availableSocieties.map((s) => (
-                        <SelectItem key={s.id} value={s.id}>
-                          {s.name} ({s.area || s.city})
-                        </SelectItem>
-                      ))}
+                      
+                      {/* Group 1: Societies that currently have configured highlights */}
+                      {configuredSocieties.length > 0 && (
+                        <SelectGroup>
+                          <SelectLabel>Configured Society Highlights</SelectLabel>
+                          {configuredSocieties.map((s) => {
+                            const slots = configuredSocietiesMap[s.id] || [];
+                            const liveCount = slots.filter((x) => x.isActive).length;
+                            return (
+                              <SelectItem key={s.id} value={s.id} className="font-semibold text-primary">
+                                ⭐ {s.name} ({s.area || s.city}) — {liveCount}/4 Live
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectGroup>
+                      )}
+
+                      {/* Group 2: All Other Societies */}
+                      <SelectGroup>
+                        {configuredSocieties.length > 0 && (
+                          <SelectLabel>All Other Societies</SelectLabel>
+                        )}
+                        {otherSocieties.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>
+                            {s.name} ({s.area || s.city})
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
                     </SelectContent>
                   </Select>
                 </div>
@@ -765,7 +821,7 @@ export function HighlightsPage() {
             </CardContent>
           </Card>
 
-          {/* Conditional Display: Prompt when no society chosen, or Slot Cards when chosen */}
+          {/* Conditional Display: Prompt when none selected, or Slot Cards when selected */}
           {!selectedSocietyId ? (
             <Card className="border-dashed border-2 border-border/80 bg-muted/20 py-12 text-center">
               <CardContent className="flex flex-col items-center justify-center space-y-3">
@@ -774,10 +830,10 @@ export function HighlightsPage() {
                 </div>
                 <div className="space-y-1 max-w-md">
                   <h3 className="text-sm sm:text-base font-bold text-foreground">
-                    No Society Selected
+                    Select a Society to Manage Highlights
                   </h3>
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Please select a society using the City, Area, and Society dropdowns above. Once selected, you can configure its 4 exclusive promotional banner slots.
+                    Choose any society from the dropdown above to view, edit, or configure its 4 promotional highlight banners.
                   </p>
                 </div>
               </CardContent>
@@ -785,39 +841,39 @@ export function HighlightsPage() {
           ) : (
             <div className="space-y-6">
               {/* Active Society Header Banner */}
-              <div className="p-3.5 rounded-xl bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800/40 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="p-3.5 rounded-xl bg-primary/5 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="size-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                  <div className="size-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
                     <Building2 className="size-4.5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="text-xs sm:text-sm font-bold text-emerald-950 dark:text-emerald-200">
-                        Configuring Highlights for: {activeSociety?.name}
+                      <h4 className="text-xs sm:text-sm font-bold text-foreground">
+                        Managing Highlights for: {activeSociety?.name}
                       </h4>
-                      <Badge className="bg-emerald-600 text-white text-[10px] font-bold">
+                      <Badge className="bg-primary text-primary-foreground text-[10px] font-bold">
                         Society Active
                       </Badge>
                     </div>
-                    <p className="text-[11px] text-emerald-800 dark:text-emerald-300">
+                    <p className="text-[11px] text-muted-foreground">
                       Located in {activeSociety?.area}, {activeSociety?.city}. Residents of this society will see these 4 banners in their home carousel.
                     </p>
                   </div>
                 </div>
 
-                <Badge variant="outline" className="text-[11px] font-semibold border-emerald-300 dark:border-emerald-700 text-emerald-800 dark:text-emerald-300 shrink-0">
+                <Badge variant="outline" className="text-[11px] font-semibold shrink-0">
                   Ratio: 2:1 (1080 x 540 px)
                 </Badge>
               </div>
 
-              {/* 4 Society Image Slots Grid */}
+              {/* 4 Society Image Slots Grid with full managing options */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {societyHighlights.map((slot) => (
                   <Card key={slot.slotNumber} className="border-border overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
                     <CardHeader className="p-4 pb-3 border-b border-border/70 bg-card">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Badge className="bg-emerald-600 text-white font-bold text-xs py-0.5 px-2">
+                          <Badge className="bg-primary text-primary-foreground font-bold text-xs py-0.5 px-2">
                             Slot #{slot.slotNumber}
                           </Badge>
                           <CardTitle className="text-sm font-bold truncate text-foreground">
@@ -877,7 +933,7 @@ export function HighlightsPage() {
                               className="hidden"
                               onChange={(e) => handleSocietyImageFileSelect(slot.slotNumber, e)}
                             />
-                            <div className="size-11 rounded-full bg-emerald-500/10 text-emerald-600 flex items-center justify-center mb-2 shadow-2xs">
+                            <div className="size-11 rounded-full bg-primary/10 text-primary flex items-center justify-center mb-2 shadow-2xs">
                               <Upload className="size-5" />
                             </div>
                             <span className="text-sm font-bold text-foreground">Upload Society Banner</span>
@@ -919,8 +975,8 @@ export function HighlightsPage() {
                           onClick={() => handleSaveSocietySlot(slot.slotNumber)}
                           className={`h-9 text-xs font-bold px-3 gap-2 rounded-xl cursor-pointer w-full justify-center transition-all shadow-2xs ${
                             slot.isDirty
-                              ? "bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm"
-                              : "hover:border-emerald-600 hover:text-emerald-600"
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                              : "hover:border-primary hover:text-primary"
                           }`}
                         >
                           <Save className="size-3.5" />
@@ -1005,7 +1061,7 @@ export function HighlightsPage() {
               <div className="p-3 text-center text-xs text-muted-foreground bg-card">
                 Slide {activeSlideIndex + 1} of 4 •{" "}
                 {activePreviewList[activeSlideIndex]?.isActive ? (
-                  <span className="text-emerald-600 font-semibold">Live</span>
+                  <span className="text-primary font-semibold">Live</span>
                 ) : (
                   <span className="text-muted-foreground">Inactive</span>
                 )}
