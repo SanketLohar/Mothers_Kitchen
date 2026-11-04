@@ -89,6 +89,8 @@ export const Route = createFileRoute("/super-admin/chefs")({
   component: ChefManagementPage,
 });
 
+export const isSellerRole = (role) => role === "seller" || role === "marketplace";
+
 function ChefAvatar({ photoUrl, name, role = "chef", size = "size-11", textSize = "text-xs", onClick, className = "" }) {
   const [hasError, setHasError] = useState(false);
   const initials = (name || "C")
@@ -110,7 +112,7 @@ function ChefAvatar({ photoUrl, name, role = "chef", size = "size-11", textSize 
     return (
       <img
         src={photoUrl.trim()}
-        alt={name || (role === "marketplace" ? "Partner" : "Chef")}
+        alt={name || (isSellerRole(role) ? "Seller" : "Chef")}
         onClick={onClick}
         className={`${size} rounded-full object-cover border border-border bg-muted ${onClick ? "cursor-pointer" : ""} ${className}`}
         onError={() => setHasError(true)}
@@ -123,7 +125,7 @@ function ChefAvatar({ photoUrl, name, role = "chef", size = "size-11", textSize 
       onClick={onClick}
       className={`${size} rounded-full border border-primary/25 bg-primary/10 text-primary font-bold ${textSize} flex items-center justify-center shrink-0 uppercase tracking-wider select-none shadow-2xs ${onClick ? "cursor-pointer" : ""} ${className}`}
     >
-      {initials || (role === "marketplace" ? <Store className="size-4" /> : <ChefHat className="size-4" />)}
+      {initials || (isSellerRole(role) ? <Store className="size-4" /> : <ChefHat className="size-4" />)}
     </div>
   );
 }
@@ -706,8 +708,8 @@ export function ChefManagementPage() {
 
         toast.success(
           newActive
-            ? `${formData.role === "marketplace" ? "Partner" : "Chef"} App Availability: isActive = true`
-            : `${formData.role === "marketplace" ? "Partner" : "Chef"} App Availability: isActive = false (Offline)`
+            ? `${formData.role === "marketplace" ? "Seller" : "Chef"} App Availability: isActive = true`
+            : `${formData.role === "marketplace" ? "Seller" : "Chef"} App Availability: isActive = false (Offline)`
         );
       } catch (err) {
         console.error("Failed to update app availability in Firestore:", err);
@@ -762,28 +764,29 @@ export function ChefManagementPage() {
     toast.success(
       deactivate
         ? `${target.fullName} has been Admin-Deactivated. They cannot log in and are offline.`
-        : `${target.fullName} has been re-enabled by Admin. ${target.role === "marketplace" ? "Partner" : "Chef"} can now take orders.`
+        : `${target.fullName} has been re-enabled by Admin. ${isSellerRole(target.role) ? "Seller" : "Chef"} can now take orders.`
     );
   };
 
   const handleSaveChef = async (e) => {
     e.preventDefault();
 
+    const isSeller = isSellerRole(formData.role);
     const chefName = String(formData.fullName || "").trim();
     const chefMob = String(formData.mobileNumber || "").trim();
 
     if (!chefName || !chefMob) {
-      toast.error(`Please fill in ${formData.role === "marketplace" ? "Partner" : "Chef"} Full Name and Mobile Number.`);
+      toast.error(`Please fill in ${isSeller ? "Seller" : "Chef"} Full Name and Mobile Number.`);
       return;
     }
 
     if (!editingChef && (!formData.photoUrl || !formData.photoUrl.trim())) {
-      toast.error(`${formData.role === "marketplace" ? "Partner" : "Chef"} photograph is mandatory for registration. Please upload a photo.`);
+      toast.error(`${isSeller ? "Seller" : "Chef"} photograph is mandatory for registration. Please upload a photo.`);
       return;
     }
 
     if (!formData.baseSociety) {
-      toast.error(`Please select a Base ${formData.role === "marketplace" ? "Operating" : "Residence"} Society.`);
+      toast.error(`Please select a Base ${isSeller ? "Operating" : "Residence"} Society.`);
       return;
     }
 
@@ -799,6 +802,7 @@ export function ChefManagementPage() {
 
     const payload = {
       ...formData,
+      role: isSeller ? "seller" : "chef",
       isDeactivatedByAdmin: isDeactivated,
       // When deactivated by admin, isActive MUST be false!
       isActive: isActive,
@@ -835,7 +839,7 @@ export function ChefManagementPage() {
                 : c
             )
           );
-          toast.success(`${payload.role === "marketplace" ? "Partner" : "Chef"} "${payload.fullName}" profile updated in Firestore!`);
+          toast.success(`${isSeller ? "Seller" : "Chef"} "${payload.fullName}" profile updated in Firestore!`);
         } else {
           setChefs((prev) =>
             prev.map((c) =>
@@ -852,16 +856,16 @@ export function ChefManagementPage() {
                 : c
             )
           );
-          toast.success(`${payload.role === "marketplace" ? "Partner" : "Chef"} "${payload.fullName}" profile updated.`);
+          toast.success(`${isSeller ? "Seller" : "Chef"} "${payload.fullName}" profile updated.`);
         }
       } else {
         if (isFirebaseConfigured) {
           const created = await createChef(payload);
-          toast.success(`${payload.role === "marketplace" ? "Marketplace Partner" : "Chef"} "${payload.fullName}" registered successfully with ID ${created.id}!`);
+          toast.success(`${isSeller ? "Marketplace Seller" : "Chef"} "${payload.fullName}" registered successfully with ID ${created.id}!`);
         } else {
           const cleanM = chefMob.replace(/\D/g, "");
           const newChef = {
-            id: `chef-${Date.now()}`,
+            id: isSeller ? `seller-${Date.now()}` : `chef-${Date.now()}`,
             ...payload,
             email: payload.email.trim() || `${cleanM}@motherskitchen.com`,
             status: isDeactivated ? "disabled" : "enabled",
@@ -869,14 +873,14 @@ export function ChefManagementPage() {
           };
           setChefs((prev) => [newChef, ...prev]);
           toast.success(
-            `${payload.role === "marketplace" ? "Marketplace Partner" : "Chef"} "${payload.fullName}" registered. Credentials: ${chefMob} / ${formData.defaultPassword}`
+            `${isSeller ? "Marketplace Seller" : "Chef"} "${payload.fullName}" registered. Credentials: ${chefMob} / ${formData.defaultPassword}`
           );
         }
       }
       handleCloseModal();
     } catch (err) {
       console.error("Save chef error:", err);
-      toast.error(`Failed to save ${formData.role === "marketplace" ? "partner" : "chef"}: ` + (err.message || "Unknown error"));
+      toast.error(`Failed to save ${isSeller ? "seller" : "chef"}: ` + (err.message || "Unknown error"));
     } finally {
       setIsSubmitting(false);
     }
@@ -895,14 +899,14 @@ export function ChefManagementPage() {
       }
     }
 
-    toast.success(`${target?.role === "marketplace" ? "Marketplace Partner" : "Chef"} "${target?.fullName || ""}" deleted.`);
+    toast.success(`${isSellerRole(target?.role) ? "Marketplace Seller" : "Chef"} "${target?.fullName || ""}" deleted.`);
     setDeleteChefId(null);
   };
 
   // SheetJS Genuine Excel (.xlsx) Export
   const handleExportExcel = () => {
     if (!filteredChefs.length) {
-      toast.error(`No ${activeRoleTab === "marketplace" ? "marketplace partner" : "chef"} records match the active filter criteria.`);
+      toast.error(`No ${activeRoleTab === "marketplace" ? "marketplace seller" : "chef"} records match the active filter criteria.`);
       return;
     }
 
@@ -910,7 +914,7 @@ export function ChefManagementPage() {
       const exportRows = filteredChefs.map((c, i) => ({
         "Sr No": i + 1,
         "User ID": c.id,
-        "Role": c.role === "marketplace" ? "Marketplace Partner" : "Chef",
+        "Role": isSellerRole(c.role) ? "Marketplace Seller" : "Chef",
         "Name": toTitleCase(c.fullName || c.name || "User"),
         "Mobile Number": c.mobileNumber,
         "Auth Email": c.authEmail || c.email || "N/A",
@@ -938,7 +942,7 @@ export function ChefManagementPage() {
   const filteredChefs = useMemo(() => {
     return chefs.map((c) => ({
       ...c,
-      fullName: toTitleCase(c.fullName || c.name || (c.role === "marketplace" ? "Partner" : "Chef")),
+      fullName: toTitleCase(c.fullName || c.name || (isSellerRole(c.role) ? "Seller" : "Chef")),
       baseSociety: toTitleCase(c.baseSociety || ""),
     })).filter((c) => {
       const query = String(searchQuery || "").toLowerCase().trim();
@@ -1025,7 +1029,7 @@ export function ChefManagementPage() {
 
       // Filter by role tab (Chefs vs Marketplace)
       const userRole = c.role || "chef";
-      const matchesRole = activeRoleTab === "marketplace" ? userRole === "marketplace" : userRole !== "marketplace";
+      const matchesRole = activeRoleTab === "marketplace" ? isSellerRole(userRole) : !isSellerRole(userRole);
       if (!matchesRole) return false;
 
       return matchesSearch && matchesStatus && matchesCity && matchesArea && matchesBaseSociety && matchesDeliveringSociety;
@@ -1048,7 +1052,7 @@ export function ChefManagementPage() {
   return (
     <Shell
       title="User Management"
-      subtitle="Register chefs and marketplace partners, provision mobile logins, manage deliverable societies and enable/disable access."
+      subtitle="Register chefs and marketplace sellers, provision mobile logins, manage deliverable societies and enable/disable access."
       headerAction={
         <Button onClick={handleOpenAddModal} className="gap-2 rounded-xl cursor-pointer">
           <Plus className="size-4" />
@@ -1076,7 +1080,7 @@ export function ChefManagementPage() {
             variant={activeRoleTab === "chef" ? "default" : "secondary"}
             className="text-xs px-2 py-0.5"
           >
-            {chefs.filter((c) => (c.role || "chef") !== "marketplace").length}
+            {chefs.filter((c) => !isSellerRole(c.role)).length}
           </Badge>
         </button>
         <button
@@ -1097,7 +1101,7 @@ export function ChefManagementPage() {
             variant={activeRoleTab === "marketplace" ? "default" : "secondary"}
             className="text-xs px-2 py-0.5"
           >
-            {chefs.filter((c) => c.role === "marketplace").length}
+            {chefs.filter((c) => isSellerRole(c.role)).length}
           </Badge>
         </button>
       </div>
@@ -1151,7 +1155,7 @@ export function ChefManagementPage() {
                 <div className="flex items-center justify-between pb-1 border-b border-border">
                   <div className="flex items-center gap-2 font-bold text-foreground text-sm">
                     <Filter className="size-4 text-primary" />
-                    <span>Filter {activeRoleTab === "marketplace" ? "Marketplace Partners" : "Chefs"}</span>
+                    <span>Filter {activeRoleTab === "marketplace" ? "Marketplace Sellers" : "Chefs"}</span>
                   </div>
                   {activeFilterCount > 0 && (
                     <button
@@ -1294,7 +1298,7 @@ export function ChefManagementPage() {
                 {/* Matched Count & Apply Button */}
                 <div className="pt-2 flex items-center justify-between border-t border-border">
                   <span className="text-xs text-muted-foreground font-medium">
-                    {filteredChefs.length} {filteredChefs.length === 1 ? (activeRoleTab === "marketplace" ? "partner" : "chef") : (activeRoleTab === "marketplace" ? "partners" : "chefs")} matched
+                    {filteredChefs.length} {filteredChefs.length === 1 ? (activeRoleTab === "marketplace" ? "seller" : "chef") : (activeRoleTab === "marketplace" ? "sellers" : "chefs")} matched
                   </span>
                   <Button
                     size="sm"
@@ -1337,7 +1341,7 @@ export function ChefManagementPage() {
             {paginatedChefs.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={5} className="h-32 text-center text-muted-foreground">
-                  No {activeRoleTab === "marketplace" ? "marketplace partners" : "chefs"} match your search criteria.
+                  No {activeRoleTab === "marketplace" ? "marketplace sellers" : "chefs"} match your search criteria.
                 </TableCell>
               </TableRow>
             ) : (
@@ -1362,7 +1366,7 @@ export function ChefManagementPage() {
                             setPreviewImage({
                               url: chef.photoUrl,
                               title: toTitleCase(chef.fullName),
-                              subtitle: `${chef.role === "marketplace" ? "Partner" : "Chef"} ID: ${chef.id} • ${toTitleCase(chef.baseSociety || "")}`
+                              subtitle: `${isSellerRole(chef.role) ? "Seller" : "Chef"} ID: ${chef.id} • ${toTitleCase(chef.baseSociety || "")}`
                             });
                           }
                         }}
@@ -1381,10 +1385,10 @@ export function ChefManagementPage() {
                           }`}
                           title={
                             chef.isActive
-                              ? `${chef.role === "marketplace" ? "Partner" : "Chef"} is Active (Taking orders on app)`
+                              ? `${isSellerRole(chef.role) ? "Seller" : "Chef"} is Active (Taking orders on app)`
                               : chef.isDeactivatedByAdmin
-                              ? `${chef.role === "marketplace" ? "Partner" : "Chef"} is Deactivated by Admin`
-                              : `${chef.role === "marketplace" ? "Partner" : "Chef"} is Offline on app`
+                              ? `${isSellerRole(chef.role) ? "Seller" : "Chef"} is Deactivated by Admin`
+                              : `${isSellerRole(chef.role) ? "Seller" : "Chef"} is Offline on app`
                           }
                         />
                       </div>
@@ -1443,7 +1447,7 @@ export function ChefManagementPage() {
                             className="text-muted-foreground hover:text-primary transition-colors p-0.5"
                             onClick={(e) => {
                               e.stopPropagation();
-                              const roleTitle = chef.role === "marketplace" ? "Partner" : "Chef";
+                              const roleTitle = isSellerRole(chef.role) ? "Seller" : "Chef";
                               const cred = `${roleTitle} Login:\nMobile: ${chef.mobileNumber}\nPassword: ${chef.defaultPassword || chef.password}`;
                               navigator.clipboard.writeText(cred);
                               toast.success("Credentials copied for WhatsApp!");
@@ -1463,7 +1467,7 @@ export function ChefManagementPage() {
                   <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
                     <div className="flex items-center justify-center gap-1.5">
                       <div
-                        title={chef.isDeactivatedByAdmin ? `${chef.role === "marketplace" ? "Partner" : "Chef"} Disabled (Click to Enable)` : `${chef.role === "marketplace" ? "Partner" : "Chef"} Enabled (Click to Disable)`}
+                        title={chef.isDeactivatedByAdmin ? `${isSellerRole(chef.role) ? "Seller" : "Chef"} Disabled (Click to Enable)` : `${isSellerRole(chef.role) ? "Seller" : "Chef"} Enabled (Click to Disable)`}
                         className="flex items-center pr-1"
                       >
                         <Switch
@@ -1484,7 +1488,7 @@ export function ChefManagementPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => handleOpenEditModal(chef)}
-                        title={chef.role === "marketplace" ? "Edit partner" : "Edit chef"}
+                        title={isSellerRole(chef.role) ? "Edit seller" : "Edit chef"}
                       >
                         <Edit2 className="size-4 text-muted-foreground hover:text-primary" />
                       </Button>
@@ -1492,7 +1496,7 @@ export function ChefManagementPage() {
                         variant="ghost"
                         size="icon"
                         onClick={() => setDeleteChefId(chef.id)}
-                        title={chef.role === "marketplace" ? "Delete partner" : "Delete chef"}
+                        title={isSellerRole(chef.role) ? "Delete seller" : "Delete chef"}
                       >
                         <Trash2 className="size-4 text-muted-foreground hover:text-destructive" />
                       </Button>
@@ -1566,11 +1570,11 @@ export function ChefManagementPage() {
               <div>
                 <DialogTitle>
                   {editingChef
-                    ? formData.role === "marketplace" ? "Edit Marketplace Partner Profile" : "Edit Chef Profile"
-                    : formData.role === "marketplace" ? "Add Marketplace Partner & Provision Login" : "Add Chef & Provision Login"}
+                    ? isSellerRole(formData.role) ? "Edit Marketplace Seller Profile" : "Edit Chef Profile"
+                    : isSellerRole(formData.role) ? "Add Marketplace Seller & Provision Login" : "Add Chef & Provision Login"}
                 </DialogTitle>
                 <DialogDescription>
-                  Register a {formData.role === "marketplace" ? "marketplace vendor" : "cook"}, allocate deliverable societies from the society directory, and configure login credentials.
+                  Register a {isSellerRole(formData.role) ? "marketplace seller" : "cook"}, allocate deliverable societies from the society directory, and configure login credentials.
                 </DialogDescription>
               </div>
               {editingChef && (
@@ -1598,15 +1602,15 @@ export function ChefManagementPage() {
                 User Role *
               </Label>
               <Select
-                value={formData.role || "chef"}
+                value={isSellerRole(formData.role) ? "seller" : "chef"}
                 onValueChange={(val) => setFormData((prev) => ({ ...prev, role: val }))}
               >
                 <SelectTrigger id="userRole" className="w-full h-10 rounded-xl bg-card">
                   <SelectValue placeholder="Select User Role" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="chef">Chef</SelectItem>
-                  <SelectItem value="marketplace">Marketplace</SelectItem>
+                  <SelectItem value="chef">Chef (Home Cook)</SelectItem>
+                  <SelectItem value="seller">Seller (Marketplace / Products)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-[11px] text-muted-foreground">
@@ -1685,7 +1689,7 @@ export function ChefManagementPage() {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold">
-                  {formData.role === "marketplace" ? "Partner / Store Photograph *" : "Chef Photograph *"}
+                  {isSellerRole(formData.role) ? "Seller / Store Photograph *" : "Chef Photograph *"}
                 </Label>
                 <span className="text-[10px] text-destructive font-bold uppercase tracking-wider">
                   Mandatory for Registration
@@ -1702,11 +1706,11 @@ export function ChefManagementPage() {
                   {formData.photoUrl && formData.photoUrl.trim() ? (
                     <img
                       src={formData.photoUrl}
-                      alt={formData.role === "marketplace" ? "Partner Preview" : "Chef Preview"}
+                      alt={isSellerRole(formData.role) ? "Seller Preview" : "Chef Preview"}
                       className="size-full object-cover"
                     />
                   ) : (
-                    formData.role === "marketplace" ? (
+                    isSellerRole(formData.role) ? (
                       <Store className="size-6 text-muted-foreground/60" />
                     ) : (
                       <ChefHat className="size-6 text-muted-foreground/60" />
@@ -1805,7 +1809,7 @@ export function ChefManagementPage() {
               <div className="space-y-3">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">
-                    {formData.role === "marketplace" ? "Base Operating Society *" : "Base Residence Society *"}
+                    {isSellerRole(formData.role) ? "Base Operating Society *" : "Base Residence Society *"}
                   </Label>
                   <Select
                     value={formData.baseSociety || undefined}
@@ -1813,7 +1817,7 @@ export function ChefManagementPage() {
                     disabled={!formData.area}
                   >
                     <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">
-                      <SelectValue placeholder={formData.area ? `Select Base ${formData.role === "marketplace" ? "Operating" : "Residence"} Society` : "Select Area First"} />
+                      <SelectValue placeholder={formData.area ? `Select Base ${isSellerRole(formData.role) ? "Operating" : "Residence"} Society` : "Select Area First"} />
                     </SelectTrigger>
                     <SelectContent>
                       {formAvailableSocieties.map((soc, idx) => (
@@ -1911,7 +1915,7 @@ export function ChefManagementPage() {
                 </span>
               </div>
               <p className="text-xs text-muted-foreground">
-                Filter by City & Area below to select societies where this {formData.role === "marketplace" ? "marketplace partner" : "cook"} is approved to deliver.
+                Filter by City & Area below to select societies where this {isSellerRole(formData.role) ? "marketplace seller" : "cook"} is approved to deliver.
               </p>
 
               {/* City and Area Filter Suggestions */}
@@ -2048,8 +2052,8 @@ export function ChefManagementPage() {
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] text-muted-foreground max-w-[180px] leading-tight">
                       {formData.isDeactivatedByAdmin
-                        ? `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} is deactivated/blocked by admin. App login blocked and offline.`
-                        : `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} account is active and allowed to take orders.`}
+                        ? `${isSellerRole(formData.role) ? "Marketplace seller" : "Chef"} is deactivated/blocked by admin. App login blocked and offline.`
+                        : `${isSellerRole(formData.role) ? "Marketplace seller" : "Chef"} account is active and allowed to take orders.`}
                     </span>
                     <Switch
                       checked={!formData.isDeactivatedByAdmin}
@@ -2062,7 +2066,7 @@ export function ChefManagementPage() {
                 <div className="p-3 rounded-lg border bg-muted/40 space-y-2">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-bold text-foreground">
-                      {formData.role === "marketplace" ? "Partner" : "Chef"} App Availability
+                      {isSellerRole(formData.role) ? "Seller" : "Chef"} App Availability
                     </Label>
                     <Badge
                       variant={!formData.isDeactivatedByAdmin && formData.isActive ? "success" : "secondary"}
@@ -2079,10 +2083,10 @@ export function ChefManagementPage() {
                   <div className="flex items-center justify-between pt-1">
                     <span className="text-[11px] text-muted-foreground max-w-[180px] leading-tight">
                       {formData.isDeactivatedByAdmin
-                        ? `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} is deactivated by admin. Cannot be active on app.`
+                        ? `${isSellerRole(formData.role) ? "Marketplace seller" : "Chef"} is deactivated by admin. Cannot be active on app.`
                         : formData.isActive
-                        ? `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} is active and taking orders on customer app.`
-                        : `${formData.role === "marketplace" ? "Marketplace partner" : "Chef"} is offline and unavailable for orders.`}
+                        ? `${isSellerRole(formData.role) ? "Marketplace seller" : "Chef"} is active and listing products on customer app.`
+                        : `${isSellerRole(formData.role) ? "Marketplace seller" : "Chef"} is offline and unavailable for orders.`}
                     </span>
                     <Switch
                       checked={!formData.isDeactivatedByAdmin && Boolean(formData.isActive)}
@@ -2103,7 +2107,7 @@ export function ChefManagementPage() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-primary font-bold text-xs uppercase tracking-wider">
                       <Lock className="size-3.5" />
-                      <span>{formData.role === "marketplace" ? "Marketplace Partner" : "Chef"} Mobile App Login Credentials</span>
+                      <span>{isSellerRole(formData.role) ? "Marketplace Seller" : "Chef"} Mobile App Login Credentials</span>
                     </div>
                     <Badge variant="outline" className="text-[10px] bg-background font-semibold">
                       Mobile Login
@@ -2113,7 +2117,7 @@ export function ChefManagementPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <Label className="text-xs">{formData.role === "marketplace" ? "Partner" : "Chef"} Mobile Login ID</Label>
+                        <Label className="text-xs">{isSellerRole(formData.role) ? "Seller" : "Chef"} Mobile Login ID</Label>
                         <span className="text-[10px] text-primary font-semibold">
                           Mobile Number
                         </span>
@@ -2124,7 +2128,7 @@ export function ChefManagementPage() {
                         className="text-xs bg-muted font-mono font-semibold"
                       />
                       <span className="text-[10px] text-muted-foreground block">
-                        {formData.role === "marketplace" ? "Partner" : "Chef"} logs into mobile app directly using their registered Mobile Number.
+                        {isSellerRole(formData.role) ? "Seller" : "Chef"} logs into mobile app directly using their registered Mobile Number.
                       </span>
                     </div>
                     <div className="space-y-1">
@@ -2137,7 +2141,7 @@ export function ChefManagementPage() {
                         required={!editingChef}
                       />
                       <span className="text-[10px] text-muted-foreground block">
-                        {formData.role === "marketplace" ? "Partner" : "Chef"} enters this in the mobile app.
+                        {isSellerRole(formData.role) ? "Seller" : "Chef"} enters this in the mobile app.
                       </span>
                     </div>
                   </div>
@@ -2145,10 +2149,10 @@ export function ChefManagementPage() {
                   <div className="rounded-lg bg-background/80 border p-2 text-[11px] text-muted-foreground space-y-1">
                     <div className="font-semibold text-foreground flex items-center gap-1.5">
                       <Shield className="size-3 text-primary" />
-                      {formData.role === "marketplace" ? "Partner" : "Chef"} Mobile Login Flow:
+                      {isSellerRole(formData.role) ? "Seller" : "Chef"} Mobile Login Flow:
                     </div>
                     <p>
-                      The {formData.role === "marketplace" ? "marketplace partner" : "chef"} logs in directly using their registered <strong>Mobile Number</strong> and this <strong>Password</strong>.
+                      The {isSellerRole(formData.role) ? "marketplace seller" : "chef"} logs in directly using their registered <strong>Mobile Number</strong> and this <strong>Password</strong>.
                       The Super Admin session remains 100% active while credentials are saved in Firestore and provisioned in Firebase Auth.
                     </p>
                   </div>
@@ -2169,10 +2173,10 @@ export function ChefManagementPage() {
                 {isSubmitting ? (
                   <>
                     <Loader2 className="size-4 animate-spin mr-2" />
-                    {editingChef ? "Saving Profile..." : (formData.role === "marketplace" ? "Registering Partner..." : "Registering Chef...")}
+                    {editingChef ? "Saving Profile..." : (isSellerRole(formData.role) ? "Registering Seller..." : "Registering Chef...")}
                   </>
                 ) : (
-                  editingChef ? "Save Profile" : (formData.role === "marketplace" ? "Register Marketplace Partner" : "Register Chef")
+                  editingChef ? "Save Profile" : (isSellerRole(formData.role) ? "Register Marketplace Seller" : "Register Chef")
                 )}
               </Button>
             </DialogFooter>
@@ -2187,11 +2191,11 @@ export function ChefManagementPage() {
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="size-5" />
               <span>
-                Delete {chefs.find((c) => c.id === deleteChefId)?.role === "marketplace" ? "Marketplace Partner" : "Chef"}?
+                Delete {isSellerRole(chefs.find((c) => c.id === deleteChefId)?.role) ? "Marketplace Seller" : "Chef"}?
               </span>
             </AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this {chefs.find((c) => c.id === deleteChefId)?.role === "marketplace" ? "marketplace partner" : "chef"}? Their listed items will be removed from all associated societies.
+              Are you sure you want to delete this {isSellerRole(chefs.find((c) => c.id === deleteChefId)?.role) ? "marketplace seller" : "chef"}? Their listed items will be removed from all associated societies.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -2215,7 +2219,7 @@ export function ChefManagementPage() {
                     setPreviewImage({
                       url: activeViewingChef.photoUrl,
                       title: toTitleCase(activeViewingChef.fullName),
-                      subtitle: `${activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
+                      subtitle: `${isSellerRole(activeViewingChef?.role) ? "Seller" : "Chef"} ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
                     });
                   }
                 }}
@@ -2252,7 +2256,7 @@ export function ChefManagementPage() {
                       setPreviewImage({
                         url: activeViewingChef.photoUrl,
                         title: toTitleCase(activeViewingChef.fullName),
-                        subtitle: `${activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
+                        subtitle: `${isSellerRole(activeViewingChef?.role) ? "Seller" : "Chef"} ID: ${activeViewingChef.id} • Aadhar / ID: ${activeViewingChef.aadharNumber || activeViewingChef.idCardNumber || "—"}`,
                       });
                     }}
                     className="text-[11px] text-primary hover:underline font-semibold flex items-center gap-1 mt-1 cursor-pointer"
@@ -2270,7 +2274,7 @@ export function ChefManagementPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
                   <Lock className="size-3.5" />
-                  <span>{activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} Mobile App Credentials</span>
+                  <span>{isSellerRole(activeViewingChef?.role) ? "Seller" : "Chef"} Mobile App Credentials</span>
                 </div>
                 <Button
                   type="button"
@@ -2278,7 +2282,7 @@ export function ChefManagementPage() {
                   variant="outline"
                   className="h-7 text-xs gap-1"
                   onClick={() => {
-                    const roleName = activeViewingChef?.role === "marketplace" ? "Partner" : "Chef";
+                    const roleName = isSellerRole(activeViewingChef?.role) ? "Seller" : "Chef";
                     const text = `Hello ${activeViewingChef?.fullName || roleName}! Welcome to Mother's Kitchen.\n\nYour ${roleName} Mobile App Login:\n• Mobile Number: ${activeViewingChef?.mobileNumber}\n• Password: ${activeViewingChef?.defaultPassword || activeViewingChef?.password || "—"}\n\nPlease keep your credentials safe.`;
                     navigator.clipboard.writeText(text);
                     toast.success("Login details copied for WhatsApp!");
@@ -2311,7 +2315,7 @@ export function ChefManagementPage() {
             <div className="flex justify-between border-b pb-2">
               <span className="text-muted-foreground">User Role:</span>
               <Badge variant="outline" className="font-semibold text-xs capitalize">
-                {activeViewingChef?.role === "marketplace" ? "Marketplace Partner" : "Chef"}
+                {isSellerRole(activeViewingChef?.role) ? "Marketplace Seller" : "Chef"}
               </Badge>
             </div>
             <div className="flex justify-between border-b pb-2">
@@ -2345,7 +2349,7 @@ export function ChefManagementPage() {
             {(activeViewingChef?.flatNumber || activeViewingChef?.wing || activeViewingChef?.floor) && (
               <div className="flex justify-between border-b pb-2">
                 <span className="text-muted-foreground">
-                  {activeViewingChef?.role === "marketplace" ? "Store / Operating Unit:" : "Residence Flat / Wing:"}
+                  {isSellerRole(activeViewingChef?.role) ? "Store / Operating Unit:" : "Residence Flat / Wing:"}
                 </span>
                 <span className="font-semibold text-right">
                   {activeViewingChef?.flatNumber ? `Flat ${activeViewingChef.flatNumber}` : ""}
@@ -2385,14 +2389,14 @@ export function ChefManagementPage() {
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-muted-foreground uppercase flex items-center gap-1.5">
                   <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                  <span>{activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} Active Deliverable Societies ({activeViewingChef?.activeDeliverableSocieties?.length || 0}):</span>
+                  <span>{isSellerRole(activeViewingChef?.role) ? "Seller" : "Chef"} Active Deliverable Societies ({activeViewingChef?.activeDeliverableSocieties?.length || 0}):</span>
                 </span>
                 <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                  Live on {activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} App
+                  Live on {isSellerRole(activeViewingChef?.role) ? "Seller" : "Chef"} App
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Societies where this {activeViewingChef?.role === "marketplace" ? "partner" : "chef"} is actively delivering (chosen &amp; toggled by the {activeViewingChef?.role === "marketplace" ? "partner" : "chef"} on mobile app).
+                Societies where this {isSellerRole(activeViewingChef?.role) ? "seller" : "chef"} is actively delivering (chosen &amp; toggled by the {isSellerRole(activeViewingChef?.role) ? "seller" : "chef"} on mobile app).
               </p>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {activeViewingChef?.activeDeliverableSocieties?.length ? (
@@ -2408,7 +2412,7 @@ export function ChefManagementPage() {
                   ))
                 ) : (
                   <span className="text-xs text-muted-foreground italic">
-                    None selected ({activeViewingChef?.role === "marketplace" ? "Partner" : "Chef"} has not chosen any active delivery societies on app)
+                    None selected ({isSellerRole(activeViewingChef?.role) ? "Seller" : "Chef"} has not chosen any active delivery societies on app)
                   </span>
                 )}
               </div>

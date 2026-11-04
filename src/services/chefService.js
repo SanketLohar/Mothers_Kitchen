@@ -12,7 +12,7 @@ import { initializeApp, getApps } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { db, firebaseConfig, isFirebaseConfigured } from "@/lib/firebase";
 
-const COLLECTION_NAME = "chefs";
+const COLLECTION_NAME = "users";
 
 /**
  * Creates a Firebase Authentication account for the chef on a secondary Firebase app.
@@ -152,19 +152,26 @@ export function subscribeToChefs(callback, onError) {
 }
 
 /**
- * Calculates next sequential Chef ID (e.g. CHEF_001, CHEF_002, CHEF_003).
+ * Calculates next sequential ID based on user role:
+ * - Chef: CHEF_001, CHEF_002, ...
+ * - Seller: SELLER_001, SELLER_002, ...
  */
-export async function getNextChefId() {
+export async function getNextUserId(role = "chef") {
+  const isSeller = role === "seller" || role === "marketplace";
+  const prefix = isSeller ? "SELLER" : "CHEF";
+
   if (!isFirebaseConfigured || !db) {
-    return "CHEF_001";
+    return `${prefix}_001`;
   }
+
+  const regex = new RegExp(`^${prefix}_(\\d+)$`, "i");
 
   try {
     const snap = await getDocs(collection(db, COLLECTION_NAME));
     let maxNum = 0;
 
     snap.forEach((d) => {
-      const match = d.id.match(/^CHEF_(\d+)$/i);
+      const match = d.id.match(regex);
       if (match) {
         const num = parseInt(match[1], 10);
         if (num > maxNum) maxNum = num;
@@ -172,24 +179,29 @@ export async function getNextChefId() {
     });
 
     const nextNum = maxNum + 1;
-    return `CHEF_${String(nextNum).padStart(3, "0")}`;
+    return `${prefix}_${String(nextNum).padStart(3, "0")}`;
   } catch (err) {
-    console.error("Error generating next chef ID:", err);
-    return `CHEF_${Date.now().toString().slice(-4)}`;
+    console.error(`Error generating next ${prefix} ID:`, err);
+    return `${prefix}_${Date.now().toString().slice(-4)}`;
   }
 }
 
+export async function getNextChefId(role = "chef") {
+  return getNextUserId(role);
+}
+
 /**
- * Synchronizes chef data into societies/{societyId}/chefs/{chefId}
- * and updates totalChefs on society documents concurrently for fast response.
+ * Synchronizes user data into societies/{societyId}/users/{userId}
+ * and updates totalChefs and totalSellers on society documents concurrently for fast response.
  */
-export async function syncChefToSocieties(chefId, chefData, assignedSocieties, baseSociety) {
+export async function syncChefToSocieties(userId, userData, assignedSocieties, baseSociety) {
   if (!isFirebaseConfigured || !db) return;
 
   try {
     const societiesSnap = await getDocs(collection(db, "societies"));
     const allAssigned = Array.from(new Set([...(assignedSocieties || []), baseSociety].filter(Boolean)));
-    const cleanMobile = (chefData.mobileNumber || "").replace(/\D/g, "");
+    const cleanMobile = (userData.mobileNumber || "").replace(/\D/g, "");
+    const role = userData.role === "marketplace" ? "seller" : (userData.role || "chef");
 
     // Process all societies concurrently using Promise.all
     await Promise.all(
@@ -202,25 +214,27 @@ export async function syncChefToSocieties(chefId, chefData, assignedSocieties, b
           (nameOrId) => nameOrId === socName || nameOrId === socId
         );
 
-        const subColDocRef = doc(db, "societies", socId, "chefs", chefId);
+        const subColDocRef = doc(db, "societies", socId, "users", userId);
 
         if (isAssigned) {
-          const isDeactivated = Boolean(chefData.isDeactivatedByAdmin);
-          const isActive = isDeactivated ? false : chefData.isActive !== false;
+          const isDeactivated = Boolean(userData.isDeactivatedByAdmin);
+          const isActive = isDeactivated ? false : userData.isActive !== false;
 
-          // Add or update chef in this society's chefs subcollection
+          // Add or update user in this society's users subcollection
           await setDoc(
             subColDocRef,
             {
-              chefId,
-              fullName: chefData.fullName || chefData.name,
-              name: chefData.fullName || chefData.name,
-              mobileNumber: chefData.mobileNumber || "",
+              userId,
+              id: userId,
+              role,
+              fullName: userData.fullName || userData.name,
+              name: userData.fullName || userData.name,
+              mobileNumber: userData.mobileNumber || "",
               loginMobile: cleanMobile,
-              email: chefData.email || "",
-              authEmail: chefData.authEmail || (cleanMobile ? `${cleanMobile}@motherskitchen.com` : ""),
-              photoUrl: chefData.photoUrl || "",
-              baseSociety: chefData.baseSociety || "",
+              email: userData.email || "",
+              authEmail: userData.authEmail || (cleanMobile ? `${cleanMobile}@motherskitchen.com` : ""),
+              photoUrl: userData.photoUrl || "",
+              baseSociety: userData.baseSociety || "",
               isActive,
               isDeactivatedByAdmin: isDeactivated,
               status: isDeactivated ? "disabled" : "enabled",
@@ -229,15 +243,19 @@ export async function syncChefToSocieties(chefId, chefData, assignedSocieties, b
             { merge: true }
           );
 
-          // Re-count chefs in this assigned society's subcollection to update totalChefs accurately
+          // Re-count users in this assigned society's subcollection to update totalChefs and totalSellers
           try {
-            const subSnap = await getDocs(collection(db, "societies", socId, "chefs"));
+            const subSnap = await getDocs(collection(db, "societies", socId, "users"));
+            const chefsCount = subSnap.docs.filter((d) => (d.data().role || "chef") === "chef").length;
+            const sellersCount = subSnap.docs.filter((d) => d.data().role === "seller" || d.data().role === "marketplace").length;
             await updateDoc(doc(db, "societies", socId), {
-              totalChefs: subSnap.size,
+              totalChefs: chefsCount,
+              totalSellers: sellersCount,
+              totalUsers: subSnap.size,
               updatedAt: serverTimestamp(),
             });
           } catch (countErr) {
-            console.warn("Could not recount chefs for society:", socId, countErr);
+            console.warn("Could not recount users for society:", socId, countErr);
           }
         } else {
           // Remove if previously assigned
@@ -248,22 +266,24 @@ export async function syncChefToSocieties(chefId, chefData, assignedSocieties, b
       })
     );
   } catch (err) {
-    console.error("Error syncing chef to societies subcollections:", err);
+    console.error("Error syncing user to societies subcollections:", err);
   }
 }
 
 /**
- * Registers a new Chef in Firestore with sequential CHEF_001 format,
+ * Registers a new Chef / Seller in Firestore in the users collection
+ * with sequential CHEF_001 or SELLER_001 format,
  * creates Firebase Auth credentials via secondary instance without signing out Admin,
- * and allocates the chef into societies/{societyId}/chefs subcollections.
+ * and allocates the user into societies/{societyId}/users subcollections.
  */
 export async function createChef(data) {
   if (!isFirebaseConfigured || !db) {
     throw new Error("Firebase is not configured.");
   }
 
-  const chefId = await getNextChefId();
-  const chefRef = doc(db, COLLECTION_NAME, chefId);
+  const role = data.role === "marketplace" ? "seller" : (data.role || "chef");
+  const userId = data.id || await getNextUserId(role);
+  const userRef = doc(db, COLLECTION_NAME, userId);
 
   const assignedSocieties = data.assignedSocieties || [];
   const baseSociety = data.baseSociety || "";
@@ -279,9 +299,11 @@ export async function createChef(data) {
     fullName: data.fullName.trim(),
   });
 
-  const chefDocData = {
-    chefId,
-    role: data.role || "chef",
+  const userDocData = {
+    userId,
+    id: userId,
+    chefId: userId,
+    role,
     fullName: data.fullName.trim(),
     name: data.fullName.trim(),
     mobileNumber: data.mobileNumber.trim(),
@@ -299,8 +321,8 @@ export async function createChef(data) {
     photoUrl: data.photoUrl || "",
     idCardUrl: data.idCardUrl || "",
     // Two clean status fields — all legacy fields removed
-    isActive: true,              // mobile app: chef activates/deactivates themselves
-    isDeactivatedByAdmin: false, // admin dashboard: blocks chef even if isActive is true
+    isActive: true,              // mobile app: user activates/deactivates themselves
+    isDeactivatedByAdmin: false, // admin dashboard: blocks user even if isActive is true
     rating: 5.0,
     ordersToday: 0,
     totalOrders: 0,
@@ -309,14 +331,14 @@ export async function createChef(data) {
     updatedAt: serverTimestamp(),
   };
 
-  await setDoc(chefRef, chefDocData);
+  await setDoc(userRef, userDocData);
 
   // Sync into subcollections under matching societies in background (non-blocking for fast UI response)
-  syncChefToSocieties(chefId, chefDocData, assignedSocieties, baseSociety).catch((syncErr) =>
+  syncChefToSocieties(userId, userDocData, assignedSocieties, baseSociety).catch((syncErr) =>
     console.warn("Background syncChefToSocieties warning:", syncErr)
   );
 
-  return { id: chefId, ...chefDocData };
+  return { id: userId, ...userDocData };
 }
 
 /**
@@ -445,30 +467,30 @@ export async function updateChefStatus(chefId, { isDeactivatedByAdmin, isActive 
     const societiesSnap = await getDocs(collection(db, "societies"));
     await Promise.all(
       societiesSnap.docs.map(async (socDoc) => {
-        const subRef = doc(db, "societies", socDoc.id, "chefs", chefId);
+        const subRef = doc(db, "societies", socDoc.id, "users", chefId);
         try {
           await updateDoc(subRef, updateData);
         } catch {}
       })
     );
   } catch (err) {
-    console.warn("Could not sync chef status to subcollections:", err);
+    console.warn("Could not sync user status to subcollections:", err);
   }
 
   return updateData;
 }
 
 /**
- * Toggles isDeactivatedByAdmin on the chef document.
- * When true: chef login is blocked and isActive becomes false.
- * When false: chef is re-enabled.
+ * Toggles isDeactivatedByAdmin on the user document.
+ * When true: user login is blocked and isActive becomes false.
+ * When false: user is re-enabled.
  */
 export async function toggleAdminDeactivation(chefId, deactivate) {
   return updateChefStatus(chefId, { isDeactivatedByAdmin: Boolean(deactivate) });
 }
 
 /**
- * Deletes a Chef from Firestore and removes from all societies subcollections.
+ * Deletes a User from Firestore and removes from all societies subcollections.
  */
 export async function deleteChef(chefId) {
   if (!isFirebaseConfigured || !db) {
@@ -482,70 +504,89 @@ export async function deleteChef(chefId) {
   try {
     const societiesSnap = await getDocs(collection(db, "societies"));
     for (const socDoc of societiesSnap.docs) {
-      const subChefRef = doc(db, "societies", socDoc.id, "chefs", chefId);
+      const subUserRef = doc(db, "societies", socDoc.id, "users", chefId);
       try {
-        await deleteDoc(subChefRef);
-        const subSnap = await getDocs(collection(db, "societies", socDoc.id, "chefs"));
+        await deleteDoc(subUserRef);
+        const subSnap = await getDocs(collection(db, "societies", socDoc.id, "users"));
+        const chefsCount = subSnap.docs.filter((d) => (d.data().role || "chef") === "chef").length;
+        const sellersCount = subSnap.docs.filter((d) => d.data().role === "seller" || d.data().role === "marketplace").length;
         await updateDoc(doc(db, "societies", socDoc.id), {
-          totalChefs: subSnap.size,
+          totalChefs: chefsCount,
+          totalSellers: sellersCount,
+          totalUsers: subSnap.size,
           updatedAt: serverTimestamp(),
         });
       } catch {}
     }
   } catch (err) {
-    console.warn("Could not remove chef from society subcollections:", err);
+    console.warn("Could not remove user from society subcollections:", err);
   }
 }
 
 /**
- * One-time backfill/synchronizer to audit all existing chefs in Firestore
- * (like CHEF_001, Sam, etc.) and ensure they are added into societies/{societyId}/chefs
- * and that each society's totalChefs counter reflects the correct count.
+ * One-time backfill/synchronizer to audit all existing users in Firestore
+ * and ensure they are added into societies/{societyId}/users
+ * and that each society's totalChefs/totalSellers counters reflect the correct count.
  */
 export async function syncExistingChefsToSocieties() {
   if (!isFirebaseConfigured || !db) return;
 
   try {
-    const chefsSnap = await getDocs(collection(db, COLLECTION_NAME));
+    const usersSnap = await getDocs(collection(db, COLLECTION_NAME));
     const societiesSnap = await getDocs(collection(db, "societies"));
 
-    const chefs = chefsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    const users = usersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
     for (const socDoc of societiesSnap.docs) {
       const socData = socDoc.data();
       const socName = socData.name;
       const socId = socDoc.id;
 
-      // Find chefs who have this society as their base society
-      const matchingChefs = chefs.filter((c) => {
-        const base = (c.baseSociety || "").trim().toLowerCase();
-        return base && (base === (socName || "").toLowerCase() || base === (socId || "").toLowerCase());
+      // Find users who have this society as their base society or allocated
+      const matchingUsers = users.filter((u) => {
+        const base = (u.baseSociety || "").trim().toLowerCase();
+        const assigned = Array.isArray(u.assignedSocieties)
+          ? u.assignedSocieties.map((s) => String(s).toLowerCase())
+          : [];
+        return (
+          (base && (base === (socName || "").toLowerCase() || base === (socId || "").toLowerCase())) ||
+          assigned.includes((socName || "").toLowerCase()) ||
+          assigned.includes((socId || "").toLowerCase())
+        );
       });
 
-      // Write each matching chef into subcollection
-      for (const chef of matchingChefs) {
-        const subRef = doc(db, "societies", socId, "chefs", chef.id);
+      // Write each matching user into subcollection
+      for (const u of matchingUsers) {
+        const subRef = doc(db, "societies", socId, "users", u.id);
+        const role = u.role === "marketplace" ? "seller" : (u.role || "chef");
         await setDoc(
           subRef,
           {
-            chefId: chef.id,
-            fullName: chef.fullName || chef.name || "Chef",
-            name: chef.fullName || chef.name || "Chef",
-            mobileNumber: chef.mobileNumber || "",
-            email: chef.email || "",
-            photoUrl: chef.photoUrl || "",
-            baseSociety: chef.baseSociety || "",
-            status: chef.status || "enabled",
-            isEnabled: chef.status !== "disabled",
-            assignedAt: chef.createdAt || serverTimestamp(),
+            userId: u.id,
+            id: u.id,
+            role,
+            fullName: u.fullName || u.name || "User",
+            name: u.fullName || u.name || "User",
+            mobileNumber: u.mobileNumber || "",
+            email: u.email || "",
+            photoUrl: u.photoUrl || "",
+            baseSociety: u.baseSociety || "",
+            status: u.status || "enabled",
+            isActive: u.isActive !== undefined ? u.isActive : true,
+            isDeactivatedByAdmin: Boolean(u.isDeactivatedByAdmin),
+            assignedAt: u.createdAt || serverTimestamp(),
           },
           { merge: true }
         );
       }
 
-      // Update totalChefs on society doc
+      // Update counters on society doc
+      const chefsCount = matchingUsers.filter((u) => (u.role || "chef") === "chef").length;
+      const sellersCount = matchingUsers.filter((u) => u.role === "seller" || u.role === "marketplace").length;
       await updateDoc(doc(db, "societies", socId), {
-        totalChefs: matchingChefs.length,
+        totalChefs: chefsCount,
+        totalSellers: sellersCount,
+        totalUsers: matchingUsers.length,
         updatedAt: serverTimestamp(),
       });
     }

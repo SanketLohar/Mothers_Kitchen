@@ -17,6 +17,8 @@ import {
   Building2,
   MapPin,
   Filter,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -85,6 +87,10 @@ export function HighlightsPage() {
   // Map of all configured society highlights across the system: { [societyId]: [slot1..4] }
   const [configuredSocietiesMap, setConfiguredSocietiesMap] = useState({});
   const autoSelectedRef = useRef(false);
+
+  // Dropdown collapse/expand and Show More state for configured societies list
+  const [isHighlightsListOpen, setIsHighlightsListOpen] = useState(false);
+  const [showAllConfiguredSocieties, setShowAllConfiguredSocieties] = useState(false);
 
   // Mobile preview carousel dialog
   const [previewCarouselOpen, setPreviewCarouselOpen] = useState(false);
@@ -169,6 +175,36 @@ export function HighlightsPage() {
     });
     return { configuredSocieties: configured, otherSocieties: others };
   }, [availableSocieties, configuredSocietiesMap]);
+
+  // All societies system-wide that have uploaded or live highlights
+  const societiesWithHighlights = useMemo(() => {
+    const configuredIds = Object.keys(configuredSocietiesMap);
+    return configuredIds
+      .map((socId) => {
+        const matchingSoc = societiesList.find((s) => s.id === socId);
+        const slots = configuredSocietiesMap[socId] || [];
+        const liveSlots = slots.filter((x) => x.isActive && x.imageUrl);
+        const uploadedSlots = slots.filter((x) => x.imageUrl || x.title);
+
+        return {
+          id: socId,
+          name: matchingSoc?.name || socId,
+          city: matchingSoc?.city || "",
+          area: matchingSoc?.area || "",
+          liveCount: liveSlots.length,
+          uploadedCount: uploadedSlots.length,
+          hasLive: liveSlots.length > 0,
+          hasUploaded: uploadedSlots.length > 0,
+        };
+      })
+      .filter((s) => s.hasUploaded)
+      .sort((a, b) => {
+        if (b.liveCount !== a.liveCount) {
+          return b.liveCount - a.liveCount;
+        }
+        return (a.name || "").localeCompare(b.name || "");
+      });
+  }, [societiesList, configuredSocietiesMap]);
 
   // Currently selected society object
   const activeSociety = useMemo(() => {
@@ -301,10 +337,10 @@ export function HighlightsPage() {
     if (isFirebaseConfigured) {
       try {
         await saveHighlightSlot(slotNumber, updated);
-        toast.success(`Global Slot #${slotNumber} is now ${next ? "ACTIVE" : "INACTIVE"} on Customer App.`);
+        toast.success(`Global Banner #${slotNumber} is now ${next ? "active" : "inactive"}.`);
       } catch (err) {
         console.error("Highlight toggle error:", err);
-        toast.error("Failed to update status: " + err.message);
+        toast.error("Failed to update banner status. Please try again.");
       }
     }
   };
@@ -320,9 +356,9 @@ export function HighlightsPage() {
         setHighlights((prev) =>
           prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
         );
-        toast.success(`Global Slot #${slotNumber} saved to Firestore! Status: ${target.isActive ? "ACTIVE (Live on App)" : "INACTIVE"}`);
+        toast.success(`Global Banner #${slotNumber} saved successfully.`);
       } catch (err) {
-        toast.error("Failed to save slot: " + err.message);
+        toast.error("Failed to save banner changes. Please try again.");
       } finally {
         setSavingSlot(null);
       }
@@ -332,7 +368,7 @@ export function HighlightsPage() {
           prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
         );
         setSavingSlot(null);
-        toast.success(`Global Slot #${slotNumber} saved.`);
+        toast.success(`Global Banner #${slotNumber} saved successfully.`);
       }, 300);
     }
   };
@@ -374,10 +410,10 @@ export function HighlightsPage() {
         prev.map((h) => (h.slotNumber === slotNumber ? updatedSlot : h))
       );
 
-      toast.info(`Photo selected for Slot #${slotNumber}. Click "Save Changes" below to commit to database.`);
+      toast.info(`Image selected for Global Banner #${slotNumber}. Click "Save Banner Changes" to apply.`);
     } catch (err) {
       console.error("Banner upload error:", err);
-      toast.error("Failed to process image: " + err.message);
+      toast.error("Failed to process image. Please try again.");
     } finally {
       e.target.value = "";
     }
@@ -389,7 +425,7 @@ export function HighlightsPage() {
     setHighlights((prev) =>
       prev.map((h) => (h.slotNumber === slotNumber ? updated : h))
     );
-    toast.info(`Photo removed for Slot #${slotNumber}. Click "Save Changes" below to save.`);
+    toast.info(`Image removed from Global Banner #${slotNumber}. Click "Save Banner Changes" to apply.`);
   };
 
   // --- SOCIETY SPECIFIC HIGHLIGHT HANDLERS ---
@@ -407,10 +443,10 @@ export function HighlightsPage() {
     if (isFirebaseConfigured) {
       try {
         await saveSocietyHighlightSlot(selectedSocietyId, slotNumber, updated);
-        toast.success(`Slot #${slotNumber} for "${activeSociety?.name || 'Society'}" is now ${next ? "ACTIVE" : "INACTIVE"} on Customer App.`);
+        toast.success(`Banner #${slotNumber} for ${activeSociety?.name || 'Society'} is now ${next ? "active" : "inactive"}.`);
       } catch (err) {
         console.error("Society highlight toggle error:", err);
-        toast.error("Failed to update status: " + err.message);
+        toast.error("Failed to update banner status. Please try again.");
       }
     }
   };
@@ -431,9 +467,9 @@ export function HighlightsPage() {
         setSocietyHighlights((prev) =>
           prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
         );
-        toast.success(`Slot #${slotNumber} for "${activeSociety?.name}" saved to Firestore! Status: ${target.isActive ? "ACTIVE (Live)" : "INACTIVE"}`);
+        toast.success(`Banner #${slotNumber} for ${activeSociety?.name || 'Society'} saved successfully.`);
       } catch (err) {
-        toast.error("Failed to save society slot: " + err.message);
+        toast.error("Failed to save banner changes. Please try again.");
       } finally {
         setSavingSocietySlot(null);
       }
@@ -443,7 +479,7 @@ export function HighlightsPage() {
           prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
         );
         setSavingSocietySlot(null);
-        toast.success(`Slot #${slotNumber} saved.`);
+        toast.success(`Banner #${slotNumber} for ${activeSociety?.name || 'Society'} saved successfully.`);
       }, 300);
     }
   };
@@ -490,10 +526,10 @@ export function HighlightsPage() {
         prev.map((h) => (h.slotNumber === slotNumber ? updatedSlot : h))
       );
 
-      toast.info(`Photo selected for Slot #${slotNumber}. Click "Save Changes" below to commit to database.`);
+      toast.info(`Image selected for Banner #${slotNumber}. Click "Save Banner Changes" to apply.`);
     } catch (err) {
       console.error("Society banner upload error:", err);
-      toast.error("Failed to process image: " + err.message);
+      toast.error("Failed to process image. Please try again.");
     } finally {
       e.target.value = "";
     }
@@ -506,7 +542,7 @@ export function HighlightsPage() {
     setSocietyHighlights((prev) =>
       prev.map((h) => (h.slotNumber === slotNumber ? updated : h))
     );
-    toast.info(`Photo removed for Slot #${slotNumber}. Click "Save Changes" below to save.`);
+    toast.info(`Image removed from Banner #${slotNumber}. Click "Save Banner Changes" to apply.`);
   };
 
   // Active highlights list for mobile preview based on selected scope
@@ -688,12 +724,12 @@ export function HighlightsPage() {
                     <Button
                       size="default"
                       variant={slot.isDirty ? "default" : "outline"}
-                      disabled={savingSlot === slot.slotNumber}
+                      disabled={!slot.isDirty || savingSlot === slot.slotNumber}
                       onClick={() => handleSaveGlobalSlot(slot.slotNumber)}
-                      className={`h-9 text-xs font-bold px-3 gap-2 rounded-xl cursor-pointer w-full justify-center transition-all shadow-2xs ${
+                      className={`h-9 text-xs font-bold px-3 gap-2 rounded-xl w-full justify-center transition-all shadow-2xs ${
                         slot.isDirty
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                          : "hover:border-primary hover:text-primary"
+                          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm cursor-pointer"
+                          : "opacity-40 cursor-not-allowed bg-muted/20 text-muted-foreground border-border/50 pointer-events-auto"
                       }`}
                     >
                       <Save className="size-3.5" />
@@ -701,7 +737,7 @@ export function HighlightsPage() {
                         {savingSlot === slot.slotNumber
                           ? "Saving Slot..."
                           : slot.isDirty
-                          ? "Save Changes *"
+                          ? "Save Banner Changes *"
                           : "Save Banner Changes"}
                       </span>
                     </Button>
@@ -716,6 +752,140 @@ export function HighlightsPage() {
       {/* ======================= TAB 2: SOCIETY SPECIFIC HIGHLIGHTS ======================= */}
       {activeScopeTab === "society" && (
         <div className="space-y-6">
+          {/* Quick-Access Bar: Societies with Uploaded / Live Highlights */}
+          <Card className="border-border shadow-xs bg-card/60 backdrop-blur-sm transition-all overflow-hidden">
+            <CardHeader
+              onClick={() => setIsHighlightsListOpen((prev) => !prev)}
+              className={`p-4 transition-colors cursor-pointer select-none hover:bg-muted/30 ${
+                isHighlightsListOpen ? "pb-3 border-b border-border/60" : ""
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="size-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                    <Sparkles className="size-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-sm font-bold truncate">Societies with Highlights</CardTitle>
+                      {societiesWithHighlights.length > 0 && (
+                        <Badge variant="outline" className="text-[11px] px-2 py-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 font-semibold">
+                          {societiesWithHighlights.filter((s) => s.hasLive).length} Live
+                        </Badge>
+                      )}
+                      <span className="text-[11px] text-muted-foreground font-medium">
+                        ({societiesWithHighlights.length} total)
+                      </span>
+                    </div>
+                    <CardDescription className="text-xs truncate hidden sm:block">
+                      Click to {isHighlightsListOpen ? "hide" : "view"} societies with custom promotional banners.
+                    </CardDescription>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs font-semibold gap-1.5 pointer-events-none text-muted-foreground"
+                  >
+                    <span>{isHighlightsListOpen ? "Collapse" : "View"}</span>
+                    <ChevronDown className={`size-4 transition-transform duration-200 ${isHighlightsListOpen ? "rotate-180" : ""}`} />
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+
+            {isHighlightsListOpen && (
+              <CardContent className="p-4 pt-3">
+                {societiesWithHighlights.length > 0 ? (
+                  <div className="space-y-3">
+                    <div className="flex flex-wrap gap-2.5">
+                      {(showAllConfiguredSocieties
+                        ? societiesWithHighlights
+                        : societiesWithHighlights.slice(0, 8)
+                      ).map((soc) => {
+                        const isSelected = selectedSocietyId === soc.id;
+                        return (
+                          <button
+                            key={soc.id}
+                            type="button"
+                            onClick={() => handleSocietyChange(soc.id)}
+                            className={`group flex items-center gap-2.5 px-3.5 py-2 rounded-xl border text-left transition-all cursor-pointer ${
+                              isSelected
+                                ? "bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20"
+                                : "bg-background/80 hover:bg-muted/80 border-border hover:border-primary/50 text-foreground"
+                            }`}
+                          >
+                            <Building2 className={`size-4 shrink-0 ${isSelected ? "text-primary-foreground" : "text-muted-foreground group-hover:text-primary"}`} />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-bold truncate max-w-[150px] sm:max-w-[200px]">
+                                  {soc.name}
+                                </span>
+                                {soc.hasLive ? (
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                    isSelected
+                                      ? "bg-white/20 text-white"
+                                      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                  }`}>
+                                    ● {soc.liveCount} Live
+                                  </span>
+                                ) : (
+                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                                    isSelected
+                                      ? "bg-white/20 text-white"
+                                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                  }`}>
+                                    Paused
+                                  </span>
+                                )}
+                              </div>
+                              <span className={`text-[10px] block truncate ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                                {soc.area ? `${soc.area}, ${soc.city || ""}` : soc.city || "Society"}
+                              </span>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Show More / Show Less Toggle Button */}
+                    {societiesWithHighlights.length > 8 && (
+                      <div className="pt-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setShowAllConfiguredSocieties((prev) => !prev)}
+                          className="h-8 text-xs font-semibold gap-1.5 rounded-lg border-dashed hover:border-primary cursor-pointer text-muted-foreground hover:text-foreground"
+                        >
+                          {showAllConfiguredSocieties ? (
+                            <>
+                              <span>Show Less</span>
+                              <ChevronUp className="size-3.5" />
+                            </>
+                          ) : (
+                            <>
+                              <span>Show More (+{societiesWithHighlights.length - 8} more societies)</span>
+                              <ChevronDown className="size-3.5" />
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+                    <Info className="size-4 shrink-0 text-muted-foreground" />
+                    <span>No societies have uploaded highlights yet. Use the dropdown filters below to pick a society and upload banners.</span>
+                  </div>
+                )}
+              </CardContent>
+            )}
+          </Card>
+
           {/* Cascading Filter Bar: City -> Area -> Society */}
           <Card className="border-border shadow-xs bg-card/60 backdrop-blur-sm">
             <CardHeader className="p-4 pb-3 border-b border-border/60">
@@ -971,12 +1141,12 @@ export function HighlightsPage() {
                         <Button
                           size="default"
                           variant={slot.isDirty ? "default" : "outline"}
-                          disabled={savingSocietySlot === slot.slotNumber}
+                          disabled={!slot.isDirty || savingSocietySlot === slot.slotNumber}
                           onClick={() => handleSaveSocietySlot(slot.slotNumber)}
-                          className={`h-9 text-xs font-bold px-3 gap-2 rounded-xl cursor-pointer w-full justify-center transition-all shadow-2xs ${
+                          className={`h-9 text-xs font-bold px-3 gap-2 rounded-xl w-full justify-center transition-all shadow-2xs ${
                             slot.isDirty
-                              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                              : "hover:border-primary hover:text-primary"
+                              ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm cursor-pointer"
+                              : "opacity-40 cursor-not-allowed bg-muted/20 text-muted-foreground border-border/50 pointer-events-auto"
                           }`}
                         >
                           <Save className="size-3.5" />
@@ -984,7 +1154,7 @@ export function HighlightsPage() {
                             {savingSocietySlot === slot.slotNumber
                               ? "Saving Slot..."
                               : slot.isDirty
-                              ? "Save Changes *"
+                              ? "Save Banner Changes *"
                               : "Save Banner Changes"}
                           </span>
                         </Button>
