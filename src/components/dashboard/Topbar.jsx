@@ -24,91 +24,46 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: "notif-1",
-    title: "New Chef Registered",
-    description: "Sunita Patil registered from Wakad. Review details and allocate delivery societies.",
-    time: "10 mins ago",
-    type: "chef",
-    read: false,
-    link: "/super-admin/chefs",
-  },
-  {
-    id: "notif-2",
-    title: "Chef Active Online",
-    description: "Chef Sam turned online to accept lunch orders in Green Valley Society.",
-    time: "40 mins ago",
-    type: "chef",
-    read: false,
-    link: "/super-admin/chefs",
-  },
-  {
-    id: "notif-3",
-    title: "High Society Demand",
-    description: "Blue Ridge Society in Hinjewadi reached 15 active meal subscriptions.",
-    time: "2 hours ago",
-    type: "society",
-    read: false,
-    link: "/super-admin/society",
-  },
-  {
-    id: "notif-4",
-    title: "Customer Database Growth",
-    description: "8 new customer addresses registered across Baner and Wakad societies.",
-    time: "5 hours ago",
-    type: "customer",
-    read: true,
-    link: "/super-admin/customers",
-  },
-];
+import {
+  subscribeToAdminNotifications,
+  markNotificationAsRead,
+  markAllNotificationsAsRead,
+  clearAllNotifications,
+} from "@/services/notificationService";
+import { formatRelativeTime } from "@/lib/utils";
 
 export function Topbar({ title, subtitle, headerAction }) {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("mk_superadmin_notifications");
-      if (saved) {
-        try {
-          return JSON.parse(saved);
-        } catch {
-          // ignore error
-        }
-      }
-    }
-    return INITIAL_NOTIFICATIONS;
-  });
-
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("all"); // 'all' | 'unread'
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("mk_superadmin_notifications", JSON.stringify(notifications));
-    }
-  }, [notifications]);
+    const unsub = subscribeToAdminNotifications((list, count) => {
+      setNotifications(list || []);
+      setUnreadCount(count || 0);
+    });
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+    return () => unsub();
+  }, []);
 
-  const handleMarkAsRead = (id) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+  const handleMarkAsRead = async (id) => {
+    await markNotificationAsRead(id);
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  const handleMarkAllAsRead = async () => {
+    await markAllNotificationsAsRead(notifications);
     toast.success("All notifications marked as read!");
   };
 
   const handleClearAll = () => {
-    setNotifications([]);
+    clearAllNotifications(notifications);
     toast.info("Notification inbox cleared.");
   };
 
-  const handleNotificationClick = (item) => {
-    handleMarkAsRead(item.id);
+  const handleNotificationClick = async (item) => {
+    await handleMarkAsRead(item.id);
     setIsOpen(false);
     if (item.link) {
       navigate({ to: item.link });
@@ -128,8 +83,10 @@ export function Topbar({ title, subtitle, headerAction }) {
         return <Building2 className="size-4 text-blue-600" />;
       case "customer":
         return <Users className="size-4 text-emerald-600" />;
-      default:
+      case "order":
         return <ShoppingBag className="size-4 text-amber-600" />;
+      default:
+        return <Bell className="size-4 text-purple-600" />;
     }
   };
 
@@ -141,8 +98,10 @@ export function Topbar({ title, subtitle, headerAction }) {
         return "bg-blue-100/70 border-blue-200";
       case "customer":
         return "bg-emerald-100/70 border-emerald-200";
-      default:
+      case "order":
         return "bg-amber-100/70 border-amber-200";
+      default:
+        return "bg-purple-100/70 border-purple-200";
     }
   };
 
@@ -314,7 +273,7 @@ export function Topbar({ title, subtitle, headerAction }) {
                             {notif.title}
                           </h4>
                           <span className="text-[10px] text-muted-foreground shrink-0 font-medium">
-                            {notif.time}
+                            {formatRelativeTime(notif.timestamp)}
                           </span>
                         </div>
                         <p className="text-[11px] text-muted-foreground line-clamp-2 leading-relaxed">

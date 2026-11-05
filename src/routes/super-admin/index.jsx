@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Shell } from "@/components/dashboard/Shell";
 import { KpiCard } from "@/components/dashboard/KpiCard";
 import {
@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { subscribeToDashboardKpis } from "@/services/dashboardService";
 import { subscribeToSocieties } from "@/services/societyService";
+import { subscribeToOrders } from "@/services/orderService";
 
 export const Route = createFileRoute("/super-admin/")({
   component: DashboardPage,
@@ -35,6 +36,7 @@ function DashboardPage() {
     totalRevenue: 0,
   });
   const [societies, setSocieties] = useState([]);
+  const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -47,11 +49,57 @@ function DashboardPage() {
       setSocieties(list || []);
     });
 
+    const unsubOrders = subscribeToOrders((list) => {
+      setOrders(list || []);
+    });
+
     return () => {
       unsubKpis();
       unsubSocs();
+      unsubOrders();
     };
   }, []);
+
+  // Compute Top Performing Societies aggregated from real orders
+  const topSocieties = useMemo(() => {
+    if (!societies || societies.length === 0) return [];
+
+    return societies
+      .map((s) => {
+        const socId = String(s.id || "").toLowerCase();
+        const socName = String(s.name || "").toLowerCase();
+
+        // Match real orders with this society
+        const matchingOrders = orders.filter((o) => {
+          const addr = o.deliveryAddress;
+          const oSocId = String(addr?.societyId || o.societyId || "").toLowerCase();
+          const oSocName = String(addr?.societyName || o.societyName || o.society || "").toLowerCase();
+          const oAddrText = typeof o.deliveryAddress === "string" ? o.deliveryAddress.toLowerCase() : "";
+
+          return (
+            (oSocId && (oSocId === socId || oSocId === `soc_${socId}`)) ||
+            (oSocName && (oSocName === socName || oSocName.includes(socName) || socName.includes(oSocName))) ||
+            (oAddrText && oAddrText.includes(socName))
+          );
+        });
+
+        const totalOrders = matchingOrders.length;
+        let totalRevenue = 0;
+        matchingOrders.forEach((o) => {
+          if (o.status !== "rejected" && o.status !== "cancelled") {
+            totalRevenue += Number(o.totalAmount || o.amount || o.itemTotal || 0);
+          }
+        });
+
+        return {
+          ...s,
+          totalOrders,
+          totalRevenue,
+        };
+      })
+      .sort((a, b) => b.totalRevenue - a.totalRevenue || b.totalOrders - a.totalOrders || a.name.localeCompare(b.name))
+      .slice(0, 5);
+  }, [societies, orders]);
 
   return (
     <Shell
@@ -106,42 +154,42 @@ function DashboardPage() {
         </Link>
       </div>
 
-      {/* KPI Cards Row (Live DB Counts — Sleek & Compact) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* KPI Cards Row (2 Rows of 3 Cards — Clean, Creative & Elevated) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Link to="/super-admin/society" className="group">
           <KpiCard
-            title="Total Societies"
+            title="Total Society"
             value={stats.totalSocieties}
             icon={Building2}
             tone="blue"
-            subtitle="Active delivery zones"
+            tag="Delivery Hubs"
           />
         </Link>
         <Link to="/super-admin/chefs" className="group">
           <KpiCard
-            title="Total Chefs"
+            title="Total Chef"
             value={stats.totalChefs}
             icon={ChefHat}
             tone="emerald"
-            subtitle="Registered home cooks"
+            tag="Home Cooks"
           />
         </Link>
         <Link to="/super-admin/chefs" className="group">
           <KpiCard
-            title="Total Sellers"
+            title="Total Seller"
             value={stats.totalSellers}
             icon={Store}
             tone="purple"
-            subtitle="Marketplace sellers"
+            tag="Marketplace"
           />
         </Link>
         <Link to="/super-admin/customers" className="group">
           <KpiCard
-            title="Total Customers"
+            title="Total Customer"
             value={stats.totalCustomers}
             icon={Users}
             tone="orange"
-            subtitle="Verified residents"
+            tag="Residents"
           />
         </Link>
         <Link to="/super-admin/reports" className="group">
@@ -149,8 +197,8 @@ function DashboardPage() {
             title="Total Orders"
             value={stats.totalOrders}
             icon={ShoppingBag}
-            tone="primary"
-            subtitle="Delivered orders"
+            tone="amber"
+            tag="Delivered"
           />
         </Link>
         <Link to="/super-admin/reports" className="group">
@@ -159,7 +207,7 @@ function DashboardPage() {
             value={formatCurrency(stats.totalRevenue)}
             icon={IndianRupee}
             tone="emerald"
-            subtitle="Kitchen network earnings"
+            tag="Earnings"
           />
         </Link>
       </div>
@@ -180,7 +228,7 @@ function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-3">
-            {societies.length === 0 ? (
+            {topSocieties.length === 0 ? (
               <div className="py-10 text-center text-muted-foreground space-y-2">
                 <Building2 className="size-8 mx-auto text-muted-foreground/40" />
                 <p className="text-xs">No societies registered in database yet.</p>
@@ -191,7 +239,7 @@ function DashboardPage() {
                 </Link>
               </div>
             ) : (
-              societies.slice(0, 5).map((soc, idx) => (
+              topSocieties.map((soc, idx) => (
                 <div
                   key={soc.id}
                   className="flex items-center justify-between p-3 rounded-xl border border-border/70 hover:bg-muted/40 transition-colors"
@@ -212,9 +260,15 @@ function DashboardPage() {
                     <div className="text-sm font-bold text-emerald-700">
                       {formatCurrency(soc.totalRevenue || 0)}
                     </div>
-                    <Badge variant={soc.status === "enabled" ? "success" : "destructive"} className="text-[10px] mt-0.5">
-                      {soc.status === "enabled" ? "Active" : "Disabled"}
-                    </Badge>
+                    <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                      <span className="text-[11px] font-semibold text-muted-foreground">
+                        {soc.totalOrders || 0} {(soc.totalOrders || 0) === 1 ? "order" : "orders"}
+                      </span>
+                      <span className="text-muted-foreground/30">•</span>
+                      <Badge variant={soc.status === "enabled" ? "success" : "destructive"} className="text-[10px] py-0 px-1.5">
+                        {soc.status === "enabled" ? "Active" : "Disabled"}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
               ))

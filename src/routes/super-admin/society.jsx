@@ -81,6 +81,7 @@ import {
   subscribeToChefs,
   syncExistingChefsToSocieties,
 } from "@/services/chefService";
+import { createAdminNotification } from "@/services/notificationService";
 
 export const Route = createFileRoute("/super-admin/society")({
   component: SocietyManagementPage,
@@ -185,23 +186,31 @@ export function SocietyManagementPage() {
     return allKnownCities.filter((c) => c.toLowerCase().includes(input));
   }, [allKnownCities, formData.city]);
 
-  // Distinct known areas from existing societies + standard Pune areas
-  const allKnownAreas = useMemo(() => {
-    const fromSocieties = societies.map((s) => toTitleCase(s.area?.trim())).filter(Boolean);
-    const defaults = [
-      "Wakad", "Baner", "Hinjewadi", "Aundh", "Kothrud",
-      "Viman Nagar", "Kharadi", "Hadapsar", "Pimple Saudagar",
-      "Bavdhan", "Magarpatta", "Pashan", "Ravet", "Balewadi",
-      "Kalyani Nagar", "Koregaon Park", "Shivajinagar"
-    ];
-    return Array.from(new Set([...fromSocieties, ...defaults])).sort();
-  }, [societies]);
+  // Distinct known areas strictly for the currently selected city (blank if new city or no city selected)
+  const areasForSelectedCity = useMemo(() => {
+    const selectedCity = (formData.city || "").trim().toLowerCase();
+    if (!selectedCity) return [];
+
+    const citySocieties = societies.filter(
+      (s) => (s.city || "").trim().toLowerCase() === selectedCity
+    );
+
+    // If new city (no societies exist in database for this city), return empty array
+    if (citySocieties.length === 0) return [];
+
+    const areas = citySocieties
+      .map((s) => toTitleCase(s.area?.trim()))
+      .filter(Boolean);
+
+    return Array.from(new Set(areas)).sort();
+  }, [societies, formData.city]);
 
   const filteredAreaSuggestions = useMemo(() => {
+    if (!areasForSelectedCity.length) return [];
     const input = (formData.area || "").trim().toLowerCase();
-    if (!input) return allKnownAreas.slice(0, 10);
-    return allKnownAreas.filter((a) => a.toLowerCase().includes(input));
-  }, [allKnownAreas, formData.area]);
+    if (!input) return areasForSelectedCity.slice(0, 10);
+    return areasForSelectedCity.filter((a) => a.toLowerCase().includes(input));
+  }, [areasForSelectedCity, formData.area]);
 
   const handleCloseModal = () => {
     setIsAddModalOpen(false);
@@ -275,7 +284,13 @@ export function SocietyManagementPage() {
 
   const handleRemoveWing = (indexToRemove) => {
     if (formData.wings.length <= 1) {
-      toast.error("A society must have at least one wing.");
+      // Clear the current wing details if only one wing remains
+      setFormData((prev) => ({
+        ...prev,
+        wings: [{ name: "", floors: 10 }],
+        numberOfWings: 1,
+      }));
+      toast.info("Cleared wing details");
       return;
     }
     const updatedWings = formData.wings.filter((_, idx) => idx !== indexToRemove);
@@ -312,6 +327,12 @@ export function SocietyManagementPage() {
     if (isFirebaseConfigured && !target.id.startsWith("soc-")) {
       try {
         await toggleSocietyStatus(id, newStatus);
+        createAdminNotification({
+          title: `Society ${newStatus === "enabled" ? "Activated" : "Deactivated"}: ${target.name}`,
+          description: `${target.name} in ${target.city || "Pune"} was ${newStatus === "enabled" ? "enabled for customer ordering" : "temporarily disabled"}.`,
+          type: "society",
+          link: "/super-admin/society",
+        });
       } catch (err) {
         console.error("Toggle error:", err);
         toast.error("Failed to update status in database.");
@@ -847,7 +868,7 @@ export function SocietyManagementPage() {
           else setIsAddModalOpen(true);
         }}
       >
-        <DialogContent className="max-w-xl">
+        <DialogContent className="w-[95vw] sm:max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editingSociety ? "Edit Society" : "Add New Location & Society"}</DialogTitle>
             <DialogDescription>
@@ -904,7 +925,7 @@ export function SocietyManagementPage() {
                         type="button"
                         className="w-full text-left px-3 py-2 text-xs hover:bg-primary/10 hover:text-primary transition-colors flex items-center justify-between group cursor-pointer border-b border-border/40 last:border-0"
                         onMouseDown={() => {
-                          setFormData({ ...formData, city: cityName });
+                          setFormData((prev) => ({ ...prev, city: cityName, area: "" }));
                           setShowCitySuggestions(false);
                         }}
                       >
@@ -942,44 +963,56 @@ export function SocietyManagementPage() {
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Area Name *
                 </Label>
-                <span className="text-[11px] text-primary font-medium">Type to search existing areas</span>
+                <span className="text-[11px] text-primary font-medium">
+                  {formData.city ? `Existing areas in ${formData.city}` : "Type to enter area"}
+                </span>
               </div>
               <div className="relative">
                 <Input
-                  placeholder="e.g. Wakad, Baner, Hinjewadi"
+                  placeholder={
+                    formData.city
+                      ? `e.g. Area in ${formData.city}...`
+                      : "e.g. Enter area name"
+                  }
                   value={formData.area}
-                  onClick={() => setShowAreaSuggestions(true)}
+                  onClick={() => {
+                    if (areasForSelectedCity.length > 0) setShowAreaSuggestions(true);
+                  }}
                   onChange={(e) => {
                     setFormData({ ...formData, area: toTitleCase(e.target.value) });
-                    setShowAreaSuggestions(true);
+                    if (areasForSelectedCity.length > 0) setShowAreaSuggestions(true);
                   }}
                   onBlur={() => {
                     setTimeout(() => setShowAreaSuggestions(false), 250);
                   }}
                   required
                   autoComplete="off"
-                  className="pr-9"
+                  className={areasForSelectedCity.length > 0 ? "pr-9" : ""}
                 />
-                <button
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => setShowAreaSuggestions((prev) => !prev)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-1"
-                  title="Toggle area suggestions"
-                >
-                  <ChevronDown className={`size-4 transition-transform duration-200 ${showAreaSuggestions ? "rotate-180" : ""}`} />
-                </button>
+                {areasForSelectedCity.length > 0 && (
+                  <button
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => setShowAreaSuggestions((prev) => !prev)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer p-1"
+                    title="Toggle area suggestions"
+                  >
+                    <ChevronDown className={`size-4 transition-transform duration-200 ${showAreaSuggestions ? "rotate-180" : ""}`} />
+                  </button>
+                )}
 
                 {/* Floating Interactive Suggestions Dropdown */}
                 {showAreaSuggestions && filteredAreaSuggestions.length > 0 && (
                   <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-popover text-popover-foreground border border-border rounded-xl shadow-xl overflow-hidden py-1 max-h-48 overflow-y-auto">
                     <div className="px-3 py-1.5 text-[10px] uppercase font-bold text-muted-foreground border-b border-border bg-muted/50 flex items-center justify-between">
-                      <span>Suggested Areas ({filteredAreaSuggestions.length})</span>
+                      <span>Areas in {formData.city} ({filteredAreaSuggestions.length})</span>
                       <span className="text-[9px] lowercase font-normal">Click to auto-fill</span>
                     </div>
                     {filteredAreaSuggestions.map((suggestion) => {
                       const count = societies.filter(
-                        (s) => s.area?.toLowerCase() === suggestion.toLowerCase()
+                        (s) =>
+                          (s.city || "").trim().toLowerCase() === (formData.city || "").trim().toLowerCase() &&
+                          (s.area || "").trim().toLowerCase() === suggestion.toLowerCase()
                       ).length;
                       return (
                         <button
@@ -1083,66 +1116,64 @@ export function SocietyManagementPage() {
                   </Badge>
                 </div>
 
-                <div className="max-h-48 overflow-y-auto space-y-2 pr-1">
+                <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
                   {formData.wings.map((w, idx) => (
-                    <div key={idx} className="flex items-center gap-2 bg-card p-2 rounded-lg border border-border">
-                      <div className="flex items-center gap-1.5 w-28 shrink-0">
-                        <span className="text-[11px] text-muted-foreground font-semibold">Wing</span>
+                    <div key={idx} className="flex items-center justify-between gap-3 bg-card p-2.5 rounded-xl border border-border">
+                      {/* 1. Wing Name Input */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs text-muted-foreground font-semibold">Wing</span>
                         <Input
                           type="text"
                           value={w.name}
                           onChange={(e) => handleWingNameChange(idx, e.target.value)}
-                          className="h-8 text-xs font-bold px-1.5 text-center"
-                          placeholder="Name"
+                          className="h-8 text-xs font-semibold px-2.5 w-32 sm:w-36 bg-background"
+                          placeholder="e.g. Chandrakala"
+                          maxLength={30}
                         />
                       </div>
-                      <div className="flex-1 flex items-center gap-1.5">
-                        <div className="flex items-center gap-1">
-                          <Button
+
+                      {/* 2. Floor Stepper Pill & Label */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center border border-input rounded-lg overflow-hidden bg-background shadow-2xs">
+                          <button
                             type="button"
-                            variant="outline"
-                            size="icon"
-                            className="size-8 rounded-lg cursor-pointer text-muted-foreground hover:text-foreground"
+                            className="size-7 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                             onClick={() => handleFloorChange(idx, Math.max(1, Number(w.floors || 1) - 1))}
                             disabled={Number(w.floors) <= 1}
                             title="Decrease floors (-)"
                           >
                             <Minus className="size-3" />
-                          </Button>
-                          <Input
+                          </button>
+                          <input
                             type="number"
                             min={1}
                             max={60}
                             value={w.floors}
                             onChange={(e) => handleFloorChange(idx, e.target.value)}
-                            className="h-8 w-16 text-xs font-semibold text-center"
+                            className="h-7 w-9 text-xs font-bold text-center border-x border-input bg-transparent focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
-                          <Button
+                          <button
                             type="button"
-                            variant="outline"
-                            size="icon"
-                            className="size-8 rounded-lg cursor-pointer text-primary hover:bg-primary hover:text-white"
+                            className="size-7 flex items-center justify-center text-primary hover:bg-primary hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                             onClick={() => handleFloorChange(idx, Math.min(60, Number(w.floors || 1) + 1))}
                             disabled={Number(w.floors) >= 60}
                             title="Increase floors (+)"
                           >
                             <Plus className="size-3" />
-                          </Button>
+                          </button>
                         </div>
-                        <span className="text-xs text-muted-foreground shrink-0">Floors</span>
+                        <span className="text-xs text-muted-foreground font-medium select-none">Floors</span>
                       </div>
-                      {formData.wings.length > 1 && (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleRemoveWing(idx)}
-                          className="size-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg cursor-pointer shrink-0"
-                          title={`Remove Wing ${w.name}`}
-                        >
-                          <Trash2 className="size-3.5" />
-                        </Button>
-                      )}
+
+                      {/* 3. Delete / Clear Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveWing(idx)}
+                        className="size-8 flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-lg transition-colors cursor-pointer shrink-0"
+                        title={formData.wings.length > 1 ? `Remove Wing ${w.name || idx + 1}` : "Clear wing details"}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
                     </div>
                   ))}
                 </div>

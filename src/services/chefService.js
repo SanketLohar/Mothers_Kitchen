@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDoc,
   getDocs,
   setDoc,
   updateDoc,
@@ -122,13 +123,18 @@ export function subscribeToChefs(callback, onError) {
           password: data.password || data.defaultPassword || "",
           defaultPassword: data.defaultPassword || data.password || "",
           assignedSocieties: Array.isArray(data.assignedSocieties) ? data.assignedSocieties : [],
-          activeDeliverableSocieties: Array.isArray(data.activeDeliverableSocieties)
-            ? data.activeDeliverableSocieties
-            : Array.isArray(data.deliverableSocieties)
-            ? data.deliverableSocieties.filter((s) => typeof s === "string" && !s.startsWith("soc_"))
-            : Array.isArray(data.assignedSocieties)
-            ? data.assignedSocieties
-            : [],
+          activeDeliverableSocieties: (() => {
+            const assignedList = Array.isArray(data.assignedSocieties) ? data.assignedSocieties : [];
+            const rawActive = Array.isArray(data.activeDeliverableSocieties)
+              ? data.activeDeliverableSocieties
+              : Array.isArray(data.deliverableSocieties)
+              ? data.deliverableSocieties.filter((s) => typeof s === "string" && !s.startsWith("soc_"))
+              : assignedList;
+            // Strict Invariant: Active deliverable societies must be approved by Admin in assignedSocieties
+            return rawActive.filter((s) =>
+              assignedList.some((as) => (as || "").trim().toLowerCase() === (s || "").trim().toLowerCase())
+            );
+          })(),
           ordersToday: Number(data.ordersToday || 0),
           rating: Number(data.rating || 5.0),
         };
@@ -354,6 +360,49 @@ export async function updateChef(chefId, data) {
   const baseSociety = data.baseSociety || "";
   const cleanMobile = (data.mobileNumber || "").replace(/\D/g, "");
 
+  // Read existing doc to sanitize activeDeliverableSocieties & societyDeliveryStatus
+  let existingActive = [];
+  let existingDeliveryStatus = {};
+  try {
+    const snap = await getDoc(docRef);
+    if (snap.exists()) {
+      const existing = snap.data();
+      existingActive = Array.isArray(existing.activeDeliverableSocieties)
+        ? existing.activeDeliverableSocieties
+        : Array.isArray(existing.deliverableSocieties)
+        ? existing.deliverableSocieties
+        : [];
+      existingDeliveryStatus = existing.societyDeliveryStatus || {};
+    }
+  } catch (err) {
+    console.warn("Could not read current activeDeliverableSocieties for reconciliation:", err);
+  }
+
+  // Strict Invariant: activeDeliverableSocieties must strictly be a subset of approved assignedSocieties.
+  // Any society removed by admin from assignedSocieties is automatically pruned from activeDeliverableSocieties!
+  const baseActive = Array.isArray(data.activeDeliverableSocieties)
+    ? data.activeDeliverableSocieties
+    : (existingActive.length > 0 ? existingActive : assignedSocieties);
+
+  const sanitizedActive = baseActive.filter((s) =>
+    assignedSocieties.some((as) => (as || "").trim().toLowerCase() === (s || "").trim().toLowerCase())
+  );
+
+  // Also clean up societyDeliveryStatus toggle map
+  const sanitizedDeliveryStatus = {};
+  if (existingDeliveryStatus && typeof existingDeliveryStatus === "object") {
+    Object.entries(existingDeliveryStatus).forEach(([key, val]) => {
+      const isApproved = assignedSocieties.some(
+        (as) =>
+          (as || "").trim().toLowerCase() === (key || "").trim().toLowerCase() ||
+          `soc_${as.trim().toLowerCase().replace(/\s+/g, "_")}` === key.toLowerCase()
+      );
+      if (isApproved) {
+        sanitizedDeliveryStatus[key] = val;
+      }
+    });
+  }
+
   const updatePayload = {
     fullName: data.fullName.trim(),
     name: data.fullName.trim(),
@@ -364,6 +413,9 @@ export async function updateChef(chefId, data) {
     address: data.address.trim(),
     baseSociety,
     assignedSocieties,
+    activeDeliverableSocieties: sanitizedActive,
+    deliverableSocieties: sanitizedActive,
+    societyDeliveryStatus: sanitizedDeliveryStatus,
     idCardNumber: data.idCardNumber?.trim() || "",
     photoUrl: data.photoUrl || "",
     idCardUrl: data.idCardUrl || "",
@@ -404,7 +456,6 @@ export async function updateChef(chefId, data) {
   if (data.city !== undefined) updatePayload.city = data.city;
   if (data.area !== undefined) updatePayload.area = data.area;
   if (data.aadharNumber !== undefined) updatePayload.aadharNumber = data.aadharNumber;
-  if (Array.isArray(data.activeDeliverableSocieties)) updatePayload.activeDeliverableSocieties = data.activeDeliverableSocieties;
 
   await updateDoc(docRef, updatePayload);
 

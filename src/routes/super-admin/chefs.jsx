@@ -84,6 +84,7 @@ import {
   deleteChef,
 } from "@/services/chefService";
 import { subscribeToSocieties } from "@/services/societyService";
+import { createAdminNotification } from "@/services/notificationService";
 
 export const Route = createFileRoute("/super-admin/chefs")({
   component: ChefManagementPage,
@@ -320,6 +321,23 @@ export function ChefManagementPage() {
       return matchCity && matchArea;
     });
   }, [societiesList, assignFilterCity, assignFilterArea]);
+
+  // Sort assignable societies so that already allocated societies and base society appear first
+  const sortedAssignableSocieties = useMemo(() => {
+    return [...filteredAssignableSocieties].sort((a, b) => {
+      const isBaseA = formData.baseSociety === a.name;
+      const isBaseB = formData.baseSociety === b.name;
+      if (isBaseA && !isBaseB) return -1;
+      if (!isBaseA && isBaseB) return 1;
+
+      const isAssignedA = formData.assignedSocieties.includes(a.name);
+      const isAssignedB = formData.assignedSocieties.includes(b.name);
+      if (isAssignedA && !isAssignedB) return -1;
+      if (!isAssignedA && isAssignedB) return 1;
+
+      return (a.name || "").localeCompare(b.name || "");
+    });
+  }, [filteredAssignableSocieties, formData.assignedSocieties, formData.baseSociety]);
 
   // Modal Form Location Options (cascading)
   const formAvailableCities = useMemo(() => {
@@ -741,6 +759,12 @@ export function ChefManagementPage() {
     if (isFirebaseConfigured && !chefId.startsWith("chef-")) {
       try {
         await toggleAdminDeactivation(chefId, deactivate);
+        createAdminNotification({
+          title: `${isSellerRole(target.role) ? "Seller" : "Chef"} ${deactivate ? "Deactivated" : "Activated"}: ${toTitleCase(target.fullName || target.name)}`,
+          description: `${toTitleCase(target.fullName || target.name)} (${target.id}) was ${deactivate ? "deactivated by admin" : "re-activated and allowed to take orders"}.`,
+          type: "chef",
+          link: "/super-admin/chefs",
+        });
       } catch (err) {
         console.error("Toggle error:", err);
         toast.error("Failed to update status in database.");
@@ -825,13 +849,18 @@ export function ChefManagementPage() {
       if (editingChef) {
         if (isFirebaseConfigured && !editingChef.id.startsWith("chef-")) {
           await updateChef(editingChef.id, payload);
-          // Update local state immediately for instant feedback
+          // Reconcile active deliverable societies locally for instant UI update
+          const updatedActive = (editingChef.activeDeliverableSocieties || []).filter((s) =>
+            payload.assignedSocieties.some((as) => (as || "").trim().toLowerCase() === (s || "").trim().toLowerCase())
+          );
           setChefs((prev) =>
             prev.map((c) =>
               c.id === editingChef.id
                 ? {
                     ...c,
                     ...payload,
+                    activeDeliverableSocieties: updatedActive,
+                    deliverableSocieties: updatedActive,
                     isDeactivatedByAdmin: isDeactivated,
                     isActive: isActive,
                     status: isDeactivated ? "disabled" : "enabled",
@@ -841,12 +870,17 @@ export function ChefManagementPage() {
           );
           toast.success(`${isSeller ? "Seller" : "Chef"} "${payload.fullName}" profile updated in Firestore!`);
         } else {
+          const updatedActive = (editingChef.activeDeliverableSocieties || []).filter((s) =>
+            payload.assignedSocieties.some((as) => (as || "").trim().toLowerCase() === (s || "").trim().toLowerCase())
+          );
           setChefs((prev) =>
             prev.map((c) =>
               c.id === editingChef.id
                 ? {
                     ...c,
                     ...payload,
+                    activeDeliverableSocieties: updatedActive,
+                    deliverableSocieties: updatedActive,
                     isDeactivatedByAdmin: isDeactivated,
                     isActive: isActive,
                     status: isDeactivated ? "disabled" : "enabled",
@@ -1151,8 +1185,14 @@ export function ChefManagementPage() {
                 </Button>
               </PopoverTrigger>
 
-              <PopoverContent align="end" className="w-80 sm:w-88 p-5 space-y-4 rounded-2xl shadow-xl border-border bg-card">
-                <div className="flex items-center justify-between pb-1 border-b border-border">
+              <PopoverContent
+                align="end"
+                collisionPadding={12}
+                sideOffset={8}
+                className="w-[calc(100vw-32px)] sm:w-92 p-0 rounded-2xl shadow-2xl border-border bg-card max-h-[80vh] sm:max-h-[85vh] flex flex-col z-50 overflow-hidden"
+              >
+                {/* Fixed Popover Header */}
+                <div className="flex items-center justify-between p-4 pb-3 border-b border-border shrink-0 bg-card">
                   <div className="flex items-center gap-2 font-bold text-foreground text-sm">
                     <Filter className="size-4 text-primary" />
                     <span>Filter {activeRoleTab === "marketplace" ? "Marketplace Sellers" : "Chefs"}</span>
@@ -1174,129 +1214,132 @@ export function ChefManagementPage() {
                   )}
                 </div>
 
-                {/* City Dropdown */}
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    City
-                  </Label>
-                  <Select
-                    value={selectedCity}
-                    onValueChange={(val) => {
-                      setSelectedCity(val);
-                      setSelectedArea("all");
-                      setSelectedBaseSociety("all");
-                      setSelectedDeliveringSociety("all");
-                    }}
-                  >
-                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
-                      <SelectValue placeholder="All Cities" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Cities</SelectItem>
-                      {availableCities.map((ct, idx) => (
-                        <SelectItem key={`filter-city-${ct}-${idx}`} value={ct}>
-                          {toTitleCase(ct)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                {/* Independently Scrollable Filters Body (Always scrollable on any screen size) */}
+                <div className="p-4 space-y-3.5 overflow-y-auto flex-1 overscroll-contain">
+                  {/* City Dropdown */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      City
+                    </Label>
+                    <Select
+                      value={selectedCity}
+                      onValueChange={(val) => {
+                        setSelectedCity(val);
+                        setSelectedArea("all");
+                        setSelectedBaseSociety("all");
+                        setSelectedDeliveringSociety("all");
+                      }}
+                    >
+                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                        <SelectValue placeholder="All Cities" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Cities</SelectItem>
+                        {availableCities.map((ct, idx) => (
+                          <SelectItem key={`filter-city-${ct}-${idx}`} value={ct}>
+                            {toTitleCase(ct)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Area Dropdown (Cascading from City) */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Area
+                    </Label>
+                    <Select
+                      value={selectedArea}
+                      onValueChange={(val) => {
+                        setSelectedArea(val);
+                        setSelectedBaseSociety("all");
+                        setSelectedDeliveringSociety("all");
+                      }}
+                    >
+                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                        <SelectValue placeholder="All Areas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Areas</SelectItem>
+                        {availableAreas.map((ar, idx) => (
+                          <SelectItem key={`filter-area-${ar}-${idx}`} value={ar}>
+                            {toTitleCase(ar)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* 1. Base Society Name Dropdown */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Base Society Name
+                    </Label>
+                    <Select
+                      value={selectedBaseSociety}
+                      onValueChange={(val) => setSelectedBaseSociety(val)}
+                    >
+                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                        <SelectValue placeholder="All Base Societies" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Base Societies</SelectItem>
+                        {availableSocieties.map((soc, idx) => (
+                          <SelectItem key={`filter-base-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
+                            {toTitleCase(soc.name)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* 2. Delivering Society Name Dropdown */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Delivering Society Name
+                    </Label>
+                    <Select
+                      value={selectedDeliveringSociety}
+                      onValueChange={(val) => setSelectedDeliveringSociety(val)}
+                    >
+                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                        <SelectValue placeholder="All Delivering Societies" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Delivering Societies</SelectItem>
+                        {availableDeliveringSocieties.map((socName, idx) => (
+                          <SelectItem key={`filter-deliv-soc-${socName}-${idx}`} value={socName}>
+                            {toTitleCase(socName)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Admin Status Dropdown */}
+                  <div className="space-y-1.5">
+                    <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                      Admin Status
+                    </Label>
+                    <Select
+                      value={statusFilter}
+                      onValueChange={(val) => setStatusFilter(val)}
+                    >
+                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
+                        <SelectValue placeholder="All Statuses" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Statuses</SelectItem>
+                        <SelectItem value="enabled">Admin Enabled</SelectItem>
+                        <SelectItem value="disabled">Admin Blocked</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                {/* Area Dropdown (Cascading from City) */}
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Area
-                  </Label>
-                  <Select
-                    value={selectedArea}
-                    onValueChange={(val) => {
-                      setSelectedArea(val);
-                      setSelectedBaseSociety("all");
-                      setSelectedDeliveringSociety("all");
-                    }}
-                  >
-                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
-                      <SelectValue placeholder="All Areas" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Areas</SelectItem>
-                      {availableAreas.map((ar, idx) => (
-                        <SelectItem key={`filter-area-${ar}-${idx}`} value={ar}>
-                          {toTitleCase(ar)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* 1. Base Society Name Dropdown */}
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Base Society Name
-                  </Label>
-                  <Select
-                    value={selectedBaseSociety}
-                    onValueChange={(val) => setSelectedBaseSociety(val)}
-                  >
-                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
-                      <SelectValue placeholder="All Base Societies" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Base Societies</SelectItem>
-                      {availableSocieties.map((soc, idx) => (
-                        <SelectItem key={`filter-base-soc-${soc.id || soc.name}-${idx}`} value={soc.name}>
-                          {toTitleCase(soc.name)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* 2. Delivering Society Name Dropdown */}
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Delivering Society Name
-                  </Label>
-                  <Select
-                    value={selectedDeliveringSociety}
-                    onValueChange={(val) => setSelectedDeliveringSociety(val)}
-                  >
-                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
-                      <SelectValue placeholder="All Delivering Societies" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Delivering Societies</SelectItem>
-                      {availableDeliveringSocieties.map((socName, idx) => (
-                        <SelectItem key={`filter-deliv-soc-${socName}-${idx}`} value={socName}>
-                          {toTitleCase(socName)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Admin Status Dropdown */}
-                <div className="space-y-1.5">
-                  <Label className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                    Admin Status
-                  </Label>
-                  <Select
-                    value={statusFilter}
-                    onValueChange={(val) => setStatusFilter(val)}
-                  >
-                    <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
-                      <SelectValue placeholder="All Statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="enabled">Admin Enabled</SelectItem>
-                      <SelectItem value="disabled">Admin Blocked</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Matched Count & Apply Button */}
-                <div className="pt-2 flex items-center justify-between border-t border-border">
+                {/* Fixed Popover Footer */}
+                <div className="p-3.5 px-4 flex items-center justify-between border-t border-border shrink-0 bg-card">
                   <span className="text-xs text-muted-foreground font-medium">
                     {filteredChefs.length} {filteredChefs.length === 1 ? (activeRoleTab === "marketplace" ? "seller" : "chef") : (activeRoleTab === "marketplace" ? "sellers" : "chefs")} matched
                   </span>
@@ -1327,14 +1370,14 @@ export function ChefManagementPage() {
 
       {/* Chefs Table (BRD p. 20) */}
       <Card className="border-border overflow-hidden">
-        <Table>
+        <Table className="min-w-[780px]">
           <TableHeader>
             <TableRow>
               <TableHead className="w-16 text-center font-bold">Sr.No</TableHead>
-              <TableHead className="text-center font-bold">Name</TableHead>
-              <TableHead className="text-center font-bold">Contact Details</TableHead>
-              <TableHead className="text-center font-bold">Address</TableHead>
-              <TableHead className="w-32 text-center font-bold">Actions</TableHead>
+              <TableHead className="min-w-[190px] text-center font-bold">Name</TableHead>
+              <TableHead className="min-w-[200px] text-center font-bold">Contact Details</TableHead>
+              <TableHead className="min-w-[220px] text-center font-bold">Address</TableHead>
+              <TableHead className="w-28 text-center font-bold">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -1356,7 +1399,7 @@ export function ChefManagementPage() {
                   <TableCell className="text-center font-bold text-muted-foreground">
                     {(currentPage - 1) * pageSize + idx + 1}
                   </TableCell>
-                  <TableCell className="text-center">
+                  <TableCell className="text-center min-w-[190px] py-3.5">
                     <div className="flex flex-col items-center justify-center gap-1.5 group/chef">
                       <div
                         className="relative shrink-0 transition-transform group-hover/chef:scale-105 cursor-pointer"
@@ -1392,20 +1435,10 @@ export function ChefManagementPage() {
                           }
                         />
                       </div>
-                      <div className="flex flex-col items-center text-center">
-                        <div className="flex items-center justify-center gap-1.5">
-                          <span className="font-bold text-foreground group-hover/chef:text-primary group-hover/chef:underline underline-offset-2 transition-colors">
-                            {toTitleCase(chef.fullName)}
-                          </span>
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-muted text-muted-foreground font-semibold">
-                            {chef.id}
-                          </span>
-                          {chef.isDeactivatedByAdmin && !chef.isActive && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-rose-100 text-rose-800 font-semibold border border-rose-200">
-                              Blocked
-                            </span>
-                          )}
-                        </div>
+                      <div className="flex flex-col items-center text-center w-full px-1">
+                        <span className="font-bold text-foreground text-sm leading-snug group-hover/chef:text-primary group-hover/chef:underline underline-offset-2 transition-colors break-words max-w-[180px] text-center">
+                          {toTitleCase(chef.fullName)}
+                        </span>
                         {/* Active on App Pill directly below Chef Name */}
                         <div className="flex items-center justify-center gap-2 mt-1">
                           {chef.isActive ? (
@@ -1421,46 +1454,35 @@ export function ChefManagementPage() {
                           )}
                         </div>
                         <div className="text-[11px] text-muted-foreground flex items-center justify-center gap-1 mt-1">
-                          <MapPin className="size-3" />
-                          <span>{toTitleCase(chef.baseSociety) || "No base society"}</span>
+                          <MapPin className="size-3 shrink-0" />
+                          <span className="truncate max-w-[170px]">{toTitleCase(chef.baseSociety) || "No base society"}</span>
                         </div>
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-center">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="font-medium text-foreground flex items-center justify-center gap-1.5">
-                        <Phone className="size-3 text-muted-foreground" />
+                  <TableCell className="text-center min-w-[200px]">
+                    <div className="flex flex-col items-center justify-center gap-0.5">
+                      <div className="font-medium text-foreground flex items-center justify-center gap-1.5 text-xs sm:text-sm whitespace-nowrap">
+                        <Phone className="size-3 text-muted-foreground shrink-0" />
                         <span>{chef.mobileNumber}</span>
                       </div>
-                      <div className="text-[11px] text-muted-foreground truncate max-w-[180px]">
-                        {chef.authEmail || chef.email || "No email"}
+                      <div className="text-[11px] text-muted-foreground flex items-center justify-center gap-1.5 truncate max-w-[200px] mt-0.5">
+                        <Mail className="size-3 text-muted-foreground shrink-0" />
+                        <span className="truncate">{chef.authEmail || chef.email || "No email"}</span>
                       </div>
-                      {(chef.defaultPassword || chef.password) && (
-                        <div className="flex items-center justify-center gap-1.5 mt-1">
-                          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">
-                            PW: {chef.defaultPassword || chef.password}
+                      {/* Chef ID / Seller ID Badge (Replacing password as requested) */}
+                      <div className="mt-1.5 whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-md bg-muted/80 text-foreground border border-border/70 shadow-2xs">
+                          <span className="text-muted-foreground font-sans font-medium text-[10px]">
+                            {isSellerRole(chef.role) ? "Seller ID:" : "Chef ID:"}
                           </span>
-                          <button
-                            type="button"
-                            title="Copy Mobile & Password"
-                            className="text-muted-foreground hover:text-primary transition-colors p-0.5"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const roleTitle = isSellerRole(chef.role) ? "Seller" : "Chef";
-                              const cred = `${roleTitle} Login:\nMobile: ${chef.mobileNumber}\nPassword: ${chef.defaultPassword || chef.password}`;
-                              navigator.clipboard.writeText(cred);
-                              toast.success("Credentials copied for WhatsApp!");
-                            }}
-                          >
-                            <Copy className="size-3" />
-                          </button>
-                        </div>
-                      )}
+                          <span>{chef.id}</span>
+                        </span>
+                      </div>
                     </div>
                   </TableCell>
-                  <TableCell className="text-center text-xs text-foreground font-medium max-w-sm">
-                    <span className="leading-relaxed block">
+                  <TableCell className="text-center text-xs text-foreground font-medium min-w-[220px] max-w-sm">
+                    <span className="leading-relaxed block px-2">
                       {formatChefAddress(chef)}
                     </span>
                   </TableCell>
@@ -1702,13 +1724,34 @@ export function ChefManagementPage() {
                     : "bg-muted/40 border-border"
                 }`}
               >
-                <div className="relative size-14 rounded-full overflow-hidden border-2 border-primary/25 bg-card flex items-center justify-center shrink-0 shadow-2xs">
+                <div
+                  className={`relative size-14 rounded-full overflow-hidden border-2 border-primary/25 bg-card flex items-center justify-center shrink-0 shadow-2xs ${
+                    formData.photoUrl && formData.photoUrl.trim()
+                      ? "cursor-pointer hover:ring-2 hover:ring-primary hover:scale-105 transition-all group/avatar"
+                      : ""
+                  }`}
+                  onClick={() => {
+                    if (formData.photoUrl && formData.photoUrl.trim()) {
+                      setPreviewImage({
+                        url: formData.photoUrl,
+                        title: formData.fullName ? toTitleCase(formData.fullName) : (isSellerRole(formData.role) ? "Seller Photograph" : "Chef Photograph"),
+                        subtitle: `${isSellerRole(formData.role) ? "Seller" : "Chef"} Profile Photo • ${editingChef ? `ID: ${editingChef.id}` : "Registration"}`
+                      });
+                    }
+                  }}
+                  title={formData.photoUrl && formData.photoUrl.trim() ? "Click to view full photograph" : ""}
+                >
                   {formData.photoUrl && formData.photoUrl.trim() ? (
-                    <img
-                      src={formData.photoUrl}
-                      alt={isSellerRole(formData.role) ? "Seller Preview" : "Chef Preview"}
-                      className="size-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={formData.photoUrl}
+                        alt={isSellerRole(formData.role) ? "Seller Preview" : "Chef Preview"}
+                        className="size-full object-cover transition-transform group-hover/avatar:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center">
+                        <Eye className="size-4 text-white drop-shadow-sm" />
+                      </div>
+                    </>
                   ) : (
                     isSellerRole(formData.role) ? (
                       <Store className="size-6 text-muted-foreground/60" />
@@ -1736,19 +1779,10 @@ export function ChefManagementPage() {
                         <span>{formData.photoUrl ? "Change Photo" : "Upload Photo *"}</span>
                       </Button>
                     </label>
-                    {formData.photoUrl && (
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setFormData((prev) => ({ ...prev, photoUrl: "" }))}
-                        className="h-8 text-xs text-destructive hover:bg-destructive/10 rounded-lg cursor-pointer"
-                      >
-                        Remove
-                      </Button>
-                    )}
                   </div>
-                  <p className="text-[10px] text-muted-foreground">PNG, JPG, or WebP up to 5 MB</p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {formData.photoUrl ? "Click profile picture to preview • PNG, JPG, or WebP up to 5 MB" : "PNG, JPG, or WebP up to 5 MB"}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1905,7 +1939,7 @@ export function ChefManagementPage() {
             </div>
 
             {/* Allocate Delivery Societies with City & Area Filter Suggestions */}
-            <div className="space-y-2 p-3.5 rounded-xl bg-muted/40 border border-border">
+            <div className="space-y-2.5 p-3.5 rounded-xl bg-muted/40 border border-border">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                   Allocate Delivery Societies *
@@ -1917,6 +1951,61 @@ export function ChefManagementPage() {
               <p className="text-xs text-muted-foreground">
                 Filter by City & Area below to select societies where this {isSellerRole(formData.role) ? "marketplace seller" : "cook"} is approved to deliver.
               </p>
+
+              {/* Quick Glance: Currently Allocated Societies at the top */}
+              {formData.assignedSocieties.length > 0 && (
+                <div className="p-2.5 rounded-xl bg-primary/5 border border-primary/25 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-primary flex items-center gap-1.5">
+                      <CheckCircle2 className="size-3.5 text-primary" />
+                      Currently Allocated Societies ({formData.assignedSocieties.length}):
+                    </span>
+                    {formData.assignedSocieties.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            assignedSocieties: prev.baseSociety ? [prev.baseSociety] : [],
+                          }))
+                        }
+                        className="text-[10px] text-muted-foreground hover:text-destructive hover:underline cursor-pointer"
+                      >
+                        Reset to Base
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pt-0.5">
+                    {formData.assignedSocieties.map((socName) => {
+                      const isBase = formData.baseSociety === socName;
+                      return (
+                        <span
+                          key={`alloc-top-${socName}`}
+                          className={`inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-lg text-xs font-bold transition-all shadow-2xs ${
+                            isBase
+                              ? "bg-primary text-primary-foreground border border-primary"
+                              : "bg-card border border-primary/30 text-primary hover:bg-rose-50 hover:text-rose-700 hover:border-rose-300 group cursor-pointer"
+                          }`}
+                          onClick={() => {
+                            if (!isBase) handleToggleSocietyAssignment(socName);
+                          }}
+                          title={isBase ? "Base society (cannot be unallocated)" : "Click to remove"}
+                        >
+                          <Building2 className="size-3 shrink-0" />
+                          <span className="truncate max-w-[150px]">{toTitleCase(socName)}</span>
+                          {isBase ? (
+                            <span className="text-[9px] px-1 py-0.2 rounded bg-white/20 text-white font-mono uppercase">
+                              Base
+                            </span>
+                          ) : (
+                            <X className="size-3 shrink-0 text-muted-foreground group-hover:text-rose-600 ml-0.5" />
+                          )}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* City and Area Filter Suggestions */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 pb-1">
@@ -1962,13 +2051,13 @@ export function ChefManagementPage() {
               {/* Select / Deselect Filtered Buttons */}
               <div className="flex items-center justify-between pt-1 text-xs">
                 <span className="text-[11px] text-muted-foreground">
-                  Showing {filteredAssignableSocieties.length} societies
+                  Showing {sortedAssignableSocieties.length} societies
                 </span>
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
-                      const names = filteredAssignableSocieties.map((s) => s.name);
+                      const names = sortedAssignableSocieties.map((s) => s.name);
                       setFormData((prev) => ({
                         ...prev,
                         assignedSocieties: Array.from(new Set([...prev.assignedSocieties, ...names])),
@@ -1982,7 +2071,7 @@ export function ChefManagementPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      const names = filteredAssignableSocieties.map((s) => s.name);
+                      const names = sortedAssignableSocieties.map((s) => s.name);
                       setFormData((prev) => ({
                         ...prev,
                         assignedSocieties: prev.assignedSocieties.filter((name) => !names.includes(name)),
@@ -1995,9 +2084,9 @@ export function ChefManagementPage() {
                 </div>
               </div>
 
-              {/* Filtered Societies Multi-Select Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pt-1 pr-1">
-                {filteredAssignableSocieties.map((soc) => {
+              {/* Filtered & Sorted Societies Multi-Select Grid (Allocated always at top) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-44 overflow-y-auto pt-1 pr-1">
+                {sortedAssignableSocieties.map((soc) => {
                   const isChecked = formData.assignedSocieties.includes(soc.name);
                   const isBase = formData.baseSociety === soc.name;
                   return (
@@ -2007,7 +2096,7 @@ export function ChefManagementPage() {
                       onClick={() => handleToggleSocietyAssignment(soc.name)}
                       className={`flex items-center justify-between p-2 rounded-lg border text-xs text-left transition-colors cursor-pointer ${
                         isChecked
-                          ? "bg-primary/10 border-primary text-primary font-bold"
+                          ? "bg-primary/10 border-primary text-primary font-bold shadow-2xs"
                           : "bg-card border-border hover:bg-muted text-foreground"
                       }`}
                     >
@@ -2445,7 +2534,7 @@ export function ChefManagementPage() {
 
       {/* Full Size Photo Preview Lightbox Dialog */}
       <Dialog open={Boolean(previewImage)} onOpenChange={(open) => !open && setPreviewImage(null)}>
-        <DialogContent className="max-w-md p-0 overflow-hidden bg-card border border-border shadow-2xl rounded-2xl z-[130]">
+        <DialogContent className="max-w-md p-0 overflow-hidden bg-card border border-border shadow-2xl rounded-2xl z-[150]">
           <DialogHeader className="p-4 pb-2 border-b border-border">
             <DialogTitle className="flex items-center justify-between text-base">
               <span>{previewImage?.title || "Photograph"}</span>
