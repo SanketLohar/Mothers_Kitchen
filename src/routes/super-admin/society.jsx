@@ -394,7 +394,7 @@ export function SocietyManagementPage() {
       if (editingSociety) {
         if (isFirebaseConfigured && !editingSociety.id.startsWith("soc-")) {
           await updateSociety(editingSociety.id, payload);
-          toast.success(`Society "${cleanedName}" updated in Firestore!`);
+          toast.success(`Society "${cleanedName}" updated successfully!`);
         } else {
           setSocieties((prev) =>
             prev.map((s) =>

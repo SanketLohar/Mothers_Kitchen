@@ -688,7 +688,7 @@ export function ChefManagementPage() {
         );
       } catch (err) {
         console.error("Failed to update admin deactivation in Firestore:", err);
-        toast.error("Failed to update status in Firestore: " + err.message);
+        toast.error("Failed to update status: " + err.message);
       }
     }
   };
@@ -731,7 +731,7 @@ export function ChefManagementPage() {
         );
       } catch (err) {
         console.error("Failed to update app availability in Firestore:", err);
-        toast.error("Failed to update availability in Firestore: " + err.message);
+        toast.error("Failed to update availability: " + err.message);
       }
     }
   };
@@ -868,7 +868,7 @@ export function ChefManagementPage() {
                 : c
             )
           );
-          toast.success(`${isSeller ? "Seller" : "Chef"} "${payload.fullName}" profile updated in Firestore!`);
+          toast.success(`${isSeller ? "Seller" : "Chef"} "${payload.fullName}" profile updated successfully!`);
         } else {
           const updatedActive = (editingChef.activeDeliverableSocieties || []).filter((s) =>
             payload.assignedSocieties.some((as) => (as || "").trim().toLowerCase() === (s || "").trim().toLowerCase())
@@ -890,7 +890,7 @@ export function ChefManagementPage() {
                 : c
             )
           );
-          toast.success(`${isSeller ? "Seller" : "Chef"} "${payload.fullName}" profile updated.`);
+          toast.success(`${isSeller ? "Seller" : "Chef"} "${payload.fullName}" profile updated successfully!`);
         }
       } else {
         if (isFirebaseConfigured) {
