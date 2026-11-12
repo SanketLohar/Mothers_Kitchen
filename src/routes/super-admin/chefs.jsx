@@ -82,7 +82,9 @@ import {
   updateChefStatus,
   toggleAdminDeactivation,
   deleteChef,
+  getNextUserId,
 } from "@/services/chefService";
+import { uploadChefProfilePhoto } from "@/services/storageService";
 import { subscribeToSocieties } from "@/services/societyService";
 import { createAdminNotification } from "@/services/notificationService";
 
@@ -279,6 +281,7 @@ export function ChefManagementPage() {
   }, [chefs, viewingChef]);
   const [previewImage, setPreviewImage] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pendingPhotoFile, setPendingPhotoFile] = useState(null);
 
   // Form State for Add / Edit Chef (BRD p. 20)
   const [formData, setFormData] = useState({
@@ -537,15 +540,16 @@ export function ChefManagementPage() {
       toast.error("Please upload an image file (PNG, JPG, WebP).");
       return;
     }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Image file size exceeds the 10 MB limit.");
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("Image file size exceeds the 15 MB limit.");
       return;
     }
 
     try {
+      setPendingPhotoFile(file);
       const compressedDataUrl = await compressImage(file);
       setFormData((prev) => ({ ...prev, photoUrl: compressedDataUrl }));
-      toast.success("Photo attached and optimized!");
+      toast.success("Photo attached & preview ready! Will be uploaded as WebP on save.");
     } catch (err) {
       console.error("Error processing photo:", err);
       toast.error("Failed to process photo. Please try a different image.");
@@ -578,6 +582,7 @@ export function ChefManagementPage() {
   const handleCloseModal = () => {
     setIsAddModalOpen(false);
     setEditingChef(null);
+    setPendingPhotoFile(null);
     setFormData({ ...initialChefFormData });
     setAssignFilterCity("all");
     setAssignFilterArea("all");
@@ -585,6 +590,7 @@ export function ChefManagementPage() {
 
   const handleOpenAddModal = () => {
     setEditingChef(null);
+    setPendingPhotoFile(null);
     setFormData({
       ...initialChefFormData,
       role: activeRoleTab,
@@ -596,6 +602,7 @@ export function ChefManagementPage() {
 
   const handleOpenEditModal = (chef) => {
     setEditingChef(chef);
+    setPendingPhotoFile(null);
     const foundSoc = societiesList.find(
       (s) => s.name === chef.baseSociety || s.id === chef.baseSociety
     );
@@ -846,6 +853,32 @@ export function ChefManagementPage() {
 
     setIsSubmitting(true);
     try {
+      // If a new photo was selected (or photoUrl is local data/blob URL), compress to WebP & upload to Firebase Storage
+      const shouldUploadPhoto = Boolean(
+        pendingPhotoFile ||
+        (formData.photoUrl && (formData.photoUrl.startsWith("data:") || formData.photoUrl.startsWith("blob:")))
+      );
+
+      if (shouldUploadPhoto && isFirebaseConfigured) {
+        try {
+          toast.loading("Uploading & optimizing photo (WebP) to Firebase Storage...", { id: "photo-upload" });
+          const targetUserId = editingChef
+            ? editingChef.id
+            : (await getNextUserId(isSeller ? "seller" : "chef"));
+          const photoInput = pendingPhotoFile || formData.photoUrl;
+          const storageUrl = await uploadChefProfilePhoto(photoInput, targetUserId, isSeller);
+          payload.photoUrl = storageUrl;
+          setFormData((prev) => ({ ...prev, photoUrl: storageUrl }));
+          setPendingPhotoFile(null);
+          toast.success("Profile photo uploaded to Cloud Storage!", { id: "photo-upload" });
+        } catch (uploadErr) {
+          console.error("Storage upload error:", uploadErr);
+          toast.error("Could not upload photo to Storage: " + (uploadErr.message || "Unknown error"), { id: "photo-upload" });
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
       if (editingChef) {
         if (isFirebaseConfigured && !editingChef.id.startsWith("chef-")) {
           await updateChef(editingChef.id, payload);

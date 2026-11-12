@@ -52,6 +52,7 @@ import {
   saveSocietyHighlightSlot,
   subscribeToAllSocietyHighlights,
 } from "@/services/highlightService";
+import { uploadHighlightBanner } from "@/services/storageService";
 import { subscribeToSocieties } from "@/services/societyService";
 
 export const Route = createFileRoute("/super-admin/highlights")({
@@ -290,7 +291,7 @@ export function HighlightsPage() {
     }
   };
 
-  // Compresses banner to high-quality persistent data URL (JPEG max 1080x540 ~50KB)
+  // Compresses banner to high-quality persistent data URL (WebP max 1080x540 ~40-60KB)
   const compressBanner = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -315,7 +316,11 @@ export function HighlightsPage() {
           ctx.fillStyle = "#FFFFFF";
           ctx.fillRect(0, 0, w, h);
           ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL("image/jpeg", 0.85));
+          try {
+            resolve(canvas.toDataURL("image/webp", 0.85));
+          } catch {
+            resolve(canvas.toDataURL("image/jpeg", 0.85));
+          }
         };
         img.src = e.target.result;
       };
@@ -352,13 +357,30 @@ export function HighlightsPage() {
     setSavingSlot(slotNumber);
     if (isFirebaseConfigured) {
       try {
-        await saveHighlightSlot(slotNumber, target);
+        let finalImageUrl = target.imageUrl || "";
+        // If image is a newly selected data or blob URL, compress to WebP and upload to Firebase Storage
+        if (finalImageUrl.startsWith("data:") || finalImageUrl.startsWith("blob:")) {
+          toast.loading(`Uploading Banner #${slotNumber} (WebP) to Firebase Storage...`, { id: `global-banner-${slotNumber}` });
+          finalImageUrl = await uploadHighlightBanner(finalImageUrl, {
+            scope: "global",
+            slotNumber,
+          });
+          toast.success(`Banner #${slotNumber} uploaded to Cloud Storage!`, { id: `global-banner-${slotNumber}` });
+        }
+
+        const slotPayload = {
+          ...target,
+          imageUrl: finalImageUrl,
+        };
+
+        await saveHighlightSlot(slotNumber, slotPayload);
         setHighlights((prev) =>
-          prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
+          prev.map((h) => (h.slotNumber === slotNumber ? { ...slotPayload, isDirty: false } : h))
         );
         toast.success(`Global Banner #${slotNumber} saved successfully.`);
       } catch (err) {
-        toast.error("Failed to save banner changes. Please try again.");
+        console.error("Save global banner error:", err);
+        toast.error("Failed to save banner changes: " + (err.message || "Please try again."));
       } finally {
         setSavingSlot(null);
       }
@@ -463,13 +485,32 @@ export function HighlightsPage() {
     setSavingSocietySlot(slotNumber);
     if (isFirebaseConfigured) {
       try {
-        await saveSocietyHighlightSlot(selectedSocietyId, slotNumber, target);
+        let finalImageUrl = target.imageUrl || "";
+        // If image is a newly selected data or blob URL, compress to WebP and upload to Firebase Storage
+        if (finalImageUrl.startsWith("data:") || finalImageUrl.startsWith("blob:")) {
+          toast.loading(`Uploading Banner #${slotNumber} (WebP) to Firebase Storage...`, { id: `soc-banner-${slotNumber}` });
+          finalImageUrl = await uploadHighlightBanner(finalImageUrl, {
+            scope: "society",
+            societyId: selectedSocietyId,
+            slotNumber,
+          });
+          toast.success(`Banner #${slotNumber} uploaded to Cloud Storage!`, { id: `soc-banner-${slotNumber}` });
+        }
+
+        const slotPayload = {
+          ...target,
+          imageUrl: finalImageUrl,
+          societyId: selectedSocietyId,
+        };
+
+        await saveSocietyHighlightSlot(selectedSocietyId, slotNumber, slotPayload);
         setSocietyHighlights((prev) =>
-          prev.map((h) => (h.slotNumber === slotNumber ? { ...h, isDirty: false } : h))
+          prev.map((h) => (h.slotNumber === slotNumber ? { ...slotPayload, isDirty: false } : h))
         );
         toast.success(`Banner #${slotNumber} for ${activeSociety?.name || 'Society'} saved successfully.`);
       } catch (err) {
-        toast.error("Failed to save banner changes. Please try again.");
+        console.error("Save society banner error:", err);
+        toast.error("Failed to save banner changes: " + (err.message || "Please try again."));
       } finally {
         setSavingSocietySlot(null);
       }
