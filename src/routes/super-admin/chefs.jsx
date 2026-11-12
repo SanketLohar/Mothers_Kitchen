@@ -342,17 +342,11 @@ export function ChefManagementPage() {
     });
   }, [filteredAssignableSocieties, formData.assignedSocieties, formData.baseSociety]);
 
-  // Modal Form Location Options (cascading)
+  // Modal Form Location Options (cascading) - strictly from societies present in database
   const formAvailableCities = useMemo(() => {
-    let extra = [];
-    try {
-      const stored = localStorage.getItem("mk_custom_cities");
-      if (stored) extra = JSON.parse(stored);
-    } catch {
-      // ignore
-    }
-    const combined = [...societiesList.map((s) => s.city), ...extra].filter(Boolean);
-    return Array.from(new Set(combined.map((c) => toTitleCase(c))));
+    return Array.from(
+      new Set(societiesList.map((s) => toTitleCase(s.city?.trim())).filter(Boolean))
+    ).sort();
   }, [societiesList]);
 
   const formAvailableAreas = useMemo(() => {
@@ -379,35 +373,44 @@ export function ChefManagementPage() {
     );
   }, [societiesList, formData.baseSociety]);
 
-  // Available wings under selected society
+  // Helper to extract clean wing letter/name without 'Wing' prefix
+  const cleanWingTag = (wing) => {
+    if (!wing) return "";
+    return String(wing).replace(/^wing\s*/i, "").replace(/\s*wing$/i, "").trim().toUpperCase();
+  };
+
+  // Available wings under selected society with accurate floor count
   const availableWingsForSociety = useMemo(() => {
     if (!currentBaseSocietyObj) return [];
     if (currentBaseSocietyObj.wings && currentBaseSocietyObj.wings.length > 0) {
       return currentBaseSocietyObj.wings.map((w) => {
         if (typeof w === "string") {
-          return { name: w.replace(/^wing\s*/i, "").trim(), floors: 10 };
+          return {
+            name: cleanWingTag(w) || "A",
+            floors: Math.max(1, Number(currentBaseSocietyObj.numberOfFloors || currentBaseSocietyObj.floors || 4)),
+          };
         }
         return {
-          name: (w?.name || "A").replace(/^wing\s*/i, "").trim(),
-          floors: Number(w?.floors || 10),
+          name: cleanWingTag(w?.name) || "A",
+          floors: Math.max(1, Number(w?.floors || currentBaseSocietyObj.numberOfFloors || currentBaseSocietyObj.floors || 4)),
         };
       });
     }
-    return [{ name: "A", floors: 10 }];
+    const defaultFloors = Math.max(1, Number(currentBaseSocietyObj.numberOfFloors || currentBaseSocietyObj.floors || 4));
+    return [{ name: "A", floors: defaultFloors }];
   }, [currentBaseSocietyObj]);
 
-  // Available floors for selected wing
+  // Available floors dynamically calculated for selected wing & society
   const availableFloorsForWing = useMemo(() => {
     if (!formData.baseSociety || !availableWingsForSociety.length) return [];
+    const targetClean = cleanWingTag(formData.wing);
     const selectedWing = availableWingsForSociety.find(
-      (w) =>
-        w.name === formData.wing ||
-        `Wing ${w.name}` === formData.wing ||
-        toTitleCase(w.name) === toTitleCase(formData.wing)
-    );
-    const count = Number(selectedWing?.floors || availableWingsForSociety[0]?.floors || 10);
-    return Array.from({ length: Math.max(1, count) }, (_, i) => i + 1);
-  }, [formData.baseSociety, availableWingsForSociety, formData.wing]);
+      (w) => w.name === targetClean
+    ) || availableWingsForSociety[0];
+
+    const count = Math.max(1, Number(selectedWing?.floors || currentBaseSocietyObj?.numberOfFloors || 4));
+    return Array.from({ length: count }, (_, i) => i + 1);
+  }, [formData.baseSociety, availableWingsForSociety, formData.wing, currentBaseSocietyObj]);
 
   const updateFormattedAddress = (flat, floor, wing, soc, area, city) => {
     const flatStr = flat ? `Flat ${flat}` : "";
@@ -447,14 +450,24 @@ export function ChefManagementPage() {
     const city = found?.city || formData.city;
     const area = found?.area || formData.area;
 
+    // Auto-select first available wing of this society
+    let defaultWingName = "A";
+    if (found?.wings && found.wings.length > 0) {
+      const firstW = found.wings[0];
+      defaultWingName = cleanWingTag(typeof firstW === "string" ? firstW : firstW?.name) || "A";
+    }
+
+    const defaultWing = defaultWingName ? `Wing ${defaultWingName}` : "";
+    const defaultFloor = "1";
+
     setFormData((prev) => ({
       ...prev,
       city,
       area,
       baseSociety: newSoc,
-      wing: "",
-      floor: "",
-      address: updateFormattedAddress(prev.flatNumber, "", "", newSoc, area, city),
+      wing: defaultWing,
+      floor: defaultFloor,
+      address: updateFormattedAddress(prev.flatNumber, defaultFloor, defaultWing, newSoc, area, city),
       // ONLY base society should be selected!
       assignedSocieties: newSoc ? [newSoc] : [],
     }));
@@ -472,17 +485,31 @@ export function ChefManagementPage() {
   const handleFormFloorChange = (floor) => {
     setFormData((prev) => ({
       ...prev,
-      floor,
-      address: updateFormattedAddress(prev.flatNumber, floor, prev.wing, prev.baseSociety, prev.area, prev.city),
+      floor: String(floor),
+      address: updateFormattedAddress(prev.flatNumber, String(floor), prev.wing, prev.baseSociety, prev.area, prev.city),
     }));
   };
 
   const handleFormWingChange = (wing) => {
-    setFormData((prev) => ({
-      ...prev,
-      wing,
-      address: updateFormattedAddress(prev.flatNumber, prev.floor, wing, prev.baseSociety, prev.area, prev.city),
-    }));
+    const clean = cleanWingTag(wing);
+    const formattedWing = clean ? `Wing ${clean}` : "";
+    const selectedWing = availableWingsForSociety.find(
+      (w) => w.name === clean
+    ) || availableWingsForSociety[0];
+
+    const maxFloors = Math.max(1, Number(selectedWing?.floors || 4));
+
+    setFormData((prev) => {
+      const currentFloorNum = parseInt(prev.floor, 10) || 1;
+      const validFloor = currentFloorNum > maxFloors ? "1" : (prev.floor || "1");
+
+      return {
+        ...prev,
+        wing: formattedWing,
+        floor: validFloor,
+        address: updateFormattedAddress(prev.flatNumber, validFloor, formattedWing, prev.baseSociety, prev.area, prev.city),
+      };
+    });
   };
 
   const handleFormStreetChange = (street) => {
@@ -612,8 +639,10 @@ export function ChefManagementPage() {
     const chefCity = toTitleCase(foundSoc?.city || chef.city || formAvailableCities[0] || "");
     const chefArea = toTitleCase(foundSoc?.area || chef.area || "");
     const chefBaseSoc = toTitleCase(chef.baseSociety || foundSoc?.name || "");
-    const chefWing = chef.wing || (foundSoc?.wings?.[0]?.name ? toTitleCase(foundSoc.wings[0].name) : "A");
-    const chefFloor = chef.floor || "1";
+    const rawWing = chef.wing || foundSoc?.wings?.[0]?.name || "A";
+    const cleanW = cleanWingTag(rawWing);
+    const chefWing = cleanW ? `Wing ${cleanW}` : "Wing A";
+    const chefFloor = chef.floor ? String(chef.floor).replace(/\D/g, "") || "1" : "1";
 
     const isDeactivated = Boolean(chef.isDeactivatedByAdmin);
     const isActive = isDeactivated ? false : (chef.isActive !== undefined ? Boolean(chef.isActive) : true);
@@ -1928,21 +1957,30 @@ export function ChefManagementPage() {
                 </div>
 
                 {/* Flat Number | Floor | Wing/Building Fields */}
+                {/* Wing/Building | Floor | Flat Number Fields (Hierarchy: Wing -> Floor -> Flat) */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  {/* Flat Number : Text box accepting number */}
+                  {/* 1. Wing/Building : Dropdown from data stored under society option */}
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Flat Number *</Label>
-                    <Input
-                      type="number"
-                      placeholder="e.g. 402"
-                      value={formData.flatNumber || ""}
-                      onChange={(e) => handleFormFlatChange(e.target.value)}
-                      className="h-10 text-xs font-semibold"
-                      required
-                    />
+                    <Label className="text-xs font-semibold">Wing / Building *</Label>
+                    <Select
+                      value={formData.wing || ""}
+                      onValueChange={(val) => handleFormWingChange(val)}
+                      disabled={!formData.baseSociety}
+                    >
+                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">
+                        <SelectValue placeholder="Select Wing" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableWingsForSociety.map((w, idx) => (
+                          <SelectItem key={`opt-wing-${w.name || idx}-${idx}`} value={`Wing ${w.name}`}>
+                            Wing {w.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {/* Floor : Dropdown from data stored under society option */}
+                  {/* 2. Floor : Dropdown dynamically loaded for the selected society & wing */}
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Floor *</Label>
                     <Select
@@ -1963,25 +2001,17 @@ export function ChefManagementPage() {
                     </Select>
                   </div>
 
-                  {/* Wing/Building : Dropdown from data stored under society option */}
+                  {/* 3. Flat Number : Text box accepting number */}
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold">Wing / Building *</Label>
-                    <Select
-                      value={formData.wing || ""}
-                      onValueChange={(val) => handleFormWingChange(val)}
-                      disabled={!formData.baseSociety}
-                    >
-                      <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed">
-                        <SelectValue placeholder="Select Wing" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableWingsForSociety.map((w, idx) => (
-                          <SelectItem key={`opt-wing-${w.name || idx}-${idx}`} value={toTitleCase(w.name)}>
-                            Wing {toTitleCase(w.name)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label className="text-xs font-semibold">Flat Number *</Label>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 402"
+                      value={formData.flatNumber || ""}
+                      onChange={(e) => handleFormFlatChange(e.target.value)}
+                      className="h-10 text-xs font-semibold"
+                      required
+                    />
                   </div>
                 </div>
               </div>
@@ -1993,7 +2023,7 @@ export function ChefManagementPage() {
                 </Label>
                 <Input
                   id="chefAddress"
-                  placeholder="e.g. Flat 402, Floor 4, Wing A, Green Valley Society, Wakad, Pune"
+                  placeholder="e.g. Flat 101, Floor 1, Wing A, Pearl, Vishrambag, Sangli"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   className="text-xs bg-muted/50 font-medium"

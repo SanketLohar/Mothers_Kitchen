@@ -165,40 +165,23 @@ export function SocietyManagementPage() {
     area: "",
     name: "",
     numberOfWings: 1,
-    wings: [{ name: "A", floors: 10 }],
+    wings: [{ name: "A", floors: 4 }],
     status: "enabled",
   });
   const [showCitySuggestions, setShowCitySuggestions] = useState(false);
   const [showAreaSuggestions, setShowAreaSuggestions] = useState(false);
-  const [customCities, setCustomCities] = useState(() => {
-    if (typeof window !== "undefined") {
-      try {
-        const saved = localStorage.getItem("mk_custom_cities");
-        return saved ? JSON.parse(saved) : [];
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  const [customCities, setCustomCities] = useState([]);
 
   const addCustomCity = (cityName) => {
     const formatted = toTitleCase(cityName?.trim() || "");
     if (!formatted) return;
-    setCustomCities((prev) => {
-      const next = Array.from(new Set([...prev, formatted]));
-      if (typeof window !== "undefined") {
-        localStorage.setItem("mk_custom_cities", JSON.stringify(next));
-      }
-      return next;
-    });
+    setCustomCities((prev) => Array.from(new Set([...prev, formatted])));
   };
 
-  // Distinct known cities from existing societies + custom added cities + standard defaults
+  // Distinct known cities ONLY from existing societies in database
   const allKnownCities = useMemo(() => {
     const fromSocieties = societies.map((s) => toTitleCase(s.city?.trim())).filter(Boolean);
-    const defaults = ["Pune", "Mumbai", "Pimpri-Chinchwad", "Nagpur", "Nashik", "Thane"];
-    return Array.from(new Set([...fromSocieties, ...customCities, ...defaults])).sort();
+    return Array.from(new Set([...fromSocieties, ...customCities])).sort();
   }, [societies, customCities]);
 
   const filteredCitySuggestions = useMemo(() => {
@@ -243,7 +226,7 @@ export function SocietyManagementPage() {
       area: "",
       name: "",
       numberOfWings: 1,
-      wings: [{ name: "A", floors: 10 }],
+      wings: [{ name: "A", floors: 4 }],
       status: "enabled",
     });
   };
@@ -259,8 +242,8 @@ export function SocietyManagementPage() {
     setShowAreaSuggestions(false);
     const wingsData =
       soc.wings && soc.wings.length > 0
-        ? soc.wings.map((w) => ({ ...w, name: toTitleCase(w.name) }))
-        : [{ name: "A", floors: 10 }];
+        ? soc.wings.map((w) => ({ ...w, name: toTitleCase(w.name), floors: Number(w.floors || 4) }))
+        : [{ name: "A", floors: Number(soc.floors || 4) }];
     setFormData({
       city: toTitleCase(soc.city || ""),
       area: toTitleCase(soc.area || ""),
@@ -277,7 +260,7 @@ export function SocietyManagementPage() {
     const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     const newWings = Array.from({ length: num }, (_, i) => {
       const existing = formData.wings[i];
-      return existing || { name: alphabet[i] || `W${i + 1}`, floors: 10 };
+      return existing || { name: alphabet[i] || `W${i + 1}`, floors: 4 };
     });
 
     setFormData((prev) => ({
@@ -295,7 +278,7 @@ export function SocietyManagementPage() {
       return;
     }
     const nextName = alphabet[currentCount] || `W${currentCount + 1}`;
-    const updatedWings = [...formData.wings, { name: nextName, floors: 10 }];
+    const updatedWings = [...formData.wings, { name: nextName, floors: 4 }];
     setFormData((prev) => ({
       ...prev,
       numberOfWings: updatedWings.length,
@@ -308,7 +291,7 @@ export function SocietyManagementPage() {
       // Clear the current wing details if only one wing remains
       setFormData((prev) => ({
         ...prev,
-        wings: [{ name: "", floors: 10 }],
+        wings: [{ name: "", floors: 4 }],
         numberOfWings: 1,
       }));
       toast.info("Cleared wing details");
@@ -350,7 +333,7 @@ export function SocietyManagementPage() {
         await toggleSocietyStatus(id, newStatus);
         createAdminNotification({
           title: `Society ${newStatus === "enabled" ? "Activated" : "Deactivated"}: ${target.name}`,
-          description: `${target.name} in ${target.city || "Pune"} was ${newStatus === "enabled" ? "enabled for customer ordering" : "temporarily disabled"}.`,
+          description: `${target.name} in ${target.city || "your area"} was ${newStatus === "enabled" ? "enabled for customer ordering" : "temporarily disabled"}.`,
           type: "society",
           link: "/super-admin/society",
         });
