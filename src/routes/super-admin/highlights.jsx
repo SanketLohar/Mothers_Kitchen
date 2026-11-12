@@ -97,6 +97,9 @@ export function HighlightsPage() {
   const [previewCarouselOpen, setPreviewCarouselOpen] = useState(false);
   const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
+  // Full-resolution single banner inspection dialog
+  const [inspectingBanner, setInspectingBanner] = useState(null);
+
   // Subscribe to Global highlights from Firestore
   useEffect(() => {
     const unsub = subscribeToHighlights((list) => {
@@ -673,6 +676,19 @@ export function HighlightsPage() {
                       <CardTitle className="text-sm font-bold truncate text-foreground">
                         {slot.title || `Global Banner ${slot.slotNumber}`}
                       </CardTitle>
+                      {slot.imageUrl && (
+                        slot.imageUrl.startsWith("data:") || slot.imageUrl.startsWith("blob:") ? (
+                          <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-800 border-amber-300 gap-1 font-semibold py-0.5 shrink-0">
+                            <Eye className="size-3 text-amber-600" />
+                            <span>Preview</span>
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-800 border-emerald-300 gap-1 font-semibold py-0.5 shrink-0">
+                            <CheckCircle2 className="size-3 text-emerald-600" />
+                            <span>WebP</span>
+                          </Badge>
+                        )
+                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs font-semibold text-muted-foreground">Active</span>
@@ -694,7 +710,26 @@ export function HighlightsPage() {
                           alt={slot.title}
                           className="size-full object-cover transition-transform duration-300 group-hover:scale-102"
                         />
-                        <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() =>
+                              setInspectingBanner({
+                                url: slot.imageUrl,
+                                title: slot.title || `Global Banner #${slot.slotNumber}`,
+                                subtitle: slot.subtitle || "",
+                                slotNumber: slot.slotNumber,
+                                scope: "Global",
+                              })
+                            }
+                            className="h-8 text-xs px-2.5 gap-1 shadow-sm cursor-pointer"
+                          >
+                            <Eye className="size-3.5 text-primary" />
+                            <span>Preview</span>
+                          </Button>
+
                           <label className="cursor-pointer">
                             <input
                               type="file"
@@ -702,17 +737,18 @@ export function HighlightsPage() {
                               className="hidden"
                               onChange={(e) => handleGlobalImageFileSelect(slot.slotNumber, e)}
                             />
-                            <Button type="button" size="sm" variant="secondary" className="h-8 text-xs px-3 gap-1.5 pointer-events-none shadow-sm">
+                            <Button type="button" size="sm" variant="outline" className="h-8 text-xs px-2.5 gap-1 pointer-events-none bg-card/90 shadow-sm">
                               <Upload className="size-3.5" />
-                              <span>Change Photo</span>
+                              <span>Replace</span>
                             </Button>
                           </label>
+
                           <Button
                             type="button"
                             size="sm"
                             variant="destructive"
                             onClick={() => handleRemoveGlobalImage(slot.slotNumber)}
-                            className="h-8 text-xs px-3 gap-1.5 shadow-sm"
+                            className="h-8 text-xs px-2.5 gap-1 shadow-sm cursor-pointer"
                           >
                             <Trash2 className="size-3.5" />
                             <span>Clear</span>
@@ -1090,6 +1126,19 @@ export function HighlightsPage() {
                           <CardTitle className="text-sm font-bold truncate text-foreground">
                             {slot.title || `Society Banner ${slot.slotNumber}`}
                           </CardTitle>
+                          {slot.imageUrl && (
+                            slot.imageUrl.startsWith("data:") || slot.imageUrl.startsWith("blob:") ? (
+                              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-800 border-amber-300 gap-1 font-semibold py-0.5 shrink-0">
+                                <Eye className="size-3 text-amber-600" />
+                                <span>Preview</span>
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-800 border-emerald-300 gap-1 font-semibold py-0.5 shrink-0">
+                                <CheckCircle2 className="size-3 text-emerald-600" />
+                                <span>WebP</span>
+                              </Badge>
+                            )
+                          )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs font-semibold text-muted-foreground">Active</span>
@@ -1111,7 +1160,26 @@ export function HighlightsPage() {
                               alt={slot.title}
                               className="size-full object-cover transition-transform duration-300 group-hover:scale-102"
                             />
-                            <div className="absolute inset-0 bg-black/55 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() =>
+                                  setInspectingBanner({
+                                    url: slot.imageUrl,
+                                    title: slot.title || `Society Banner #${slot.slotNumber}`,
+                                    subtitle: slot.subtitle || "",
+                                    slotNumber: slot.slotNumber,
+                                    scope: activeSociety?.name || "Society",
+                                  })
+                                }
+                                className="h-8 text-xs px-2.5 gap-1 shadow-sm cursor-pointer"
+                              >
+                                <Eye className="size-3.5 text-primary" />
+                                <span>Preview</span>
+                              </Button>
+
                               <label className="cursor-pointer">
                                 <input
                                   type="file"
@@ -1119,17 +1187,18 @@ export function HighlightsPage() {
                                   className="hidden"
                                   onChange={(e) => handleSocietyImageFileSelect(slot.slotNumber, e)}
                                 />
-                                <Button type="button" size="sm" variant="secondary" className="h-8 text-xs px-3 gap-1.5 pointer-events-none shadow-sm">
+                                <Button type="button" size="sm" variant="outline" className="h-8 text-xs px-2.5 gap-1 pointer-events-none bg-card/90 shadow-sm">
                                   <Upload className="size-3.5" />
-                                  <span>Change Photo</span>
+                                  <span>Replace</span>
                                 </Button>
                               </label>
+
                               <Button
                                 type="button"
                                 size="sm"
                                 variant="destructive"
                                 onClick={() => handleRemoveSocietyImage(slot.slotNumber)}
-                                className="h-8 text-xs px-3 gap-1.5 shadow-sm"
+                                className="h-8 text-xs px-2.5 gap-1 shadow-sm cursor-pointer"
                               >
                                 <Trash2 className="size-3.5" />
                                 <span>Clear</span>
@@ -1285,6 +1354,54 @@ export function HighlightsPage() {
               Close Preview
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Full-resolution Single Banner Inspection Dialog */}
+      <Dialog open={Boolean(inspectingBanner)} onOpenChange={(open) => !open && setInspectingBanner(null)}>
+        <DialogContent className="max-w-2xl p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center justify-between gap-2">
+              <span className="flex items-center gap-2">
+                <Sparkles className="size-4 text-primary" />
+                <span>{inspectingBanner?.title || `Banner #${inspectingBanner?.slotNumber} Preview`}</span>
+              </span>
+              <Badge variant="outline" className="text-[10px] font-mono">
+                {inspectingBanner?.scope ? `${inspectingBanner.scope} • ` : ""}Slot #{inspectingBanner?.slotNumber}
+              </Badge>
+            </DialogTitle>
+            {inspectingBanner?.subtitle && (
+              <DialogDescription className="text-xs text-muted-foreground">
+                {inspectingBanner.subtitle}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="relative aspect-[2/1] w-full rounded-xl overflow-hidden border border-border bg-black/5 shadow-inner my-2">
+            <img
+              src={inspectingBanner?.url}
+              alt={inspectingBanner?.title || "Banner Preview"}
+              className="size-full object-cover"
+            />
+          </div>
+
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
+            <span className="text-[11px]">
+              {inspectingBanner?.url?.startsWith("data:") || inspectingBanner?.url?.startsWith("blob:") ? (
+                <span className="text-amber-700 font-medium">Local WebP Preview • Ready to save to Firebase Storage</span>
+              ) : (
+                <span className="text-emerald-700 font-medium">Active Firebase Cloud Storage WebP Asset</span>
+              )}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setInspectingBanner(null)}
+              className="h-8 text-xs font-semibold rounded-lg"
+            >
+              Close
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </Shell>

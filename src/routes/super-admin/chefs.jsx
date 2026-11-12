@@ -1793,8 +1793,8 @@ export function ChefManagementPage() {
                     )
                   )}
                 </div>
-                <div className="flex-1 space-y-1">
-                  <div className="flex items-center gap-2">
+                <div className="flex-1 space-y-1.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <label className="cursor-pointer">
                       <input
                         type="file"
@@ -1812,10 +1812,46 @@ export function ChefManagementPage() {
                         <span>{formData.photoUrl ? "Change Photo" : "Upload Photo *"}</span>
                       </Button>
                     </label>
+
+                    {formData.photoUrl && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => {
+                          setPreviewImage({
+                            url: formData.photoUrl,
+                            title: formData.fullName ? toTitleCase(formData.fullName) : (isSellerRole(formData.role) ? "Seller Photograph" : "Chef Photograph"),
+                            subtitle: `${isSellerRole(formData.role) ? "Seller" : "Chef"} Profile Photo • ${editingChef ? `ID: ${editingChef.id}` : "Registration"}`
+                          });
+                        }}
+                        className="h-8 text-xs gap-1.5 rounded-lg border bg-card hover:bg-muted cursor-pointer"
+                      >
+                        <Eye className="size-3.5 text-primary" />
+                        <span>Inspect Full Photo</span>
+                      </Button>
+                    )}
                   </div>
-                  <p className="text-[10px] text-muted-foreground">
-                    {formData.photoUrl ? "Click profile picture to preview • PNG, JPG, or WebP up to 5 MB" : "PNG, JPG, or WebP up to 5 MB"}
-                  </p>
+
+                  {formData.photoUrl ? (
+                    <div className="flex items-center gap-1.5">
+                      {formData.photoUrl.startsWith("data:") || formData.photoUrl.startsWith("blob:") ? (
+                        <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-800 border-amber-300 gap-1 font-semibold py-0.5">
+                          <Eye className="size-3 text-amber-600" />
+                          <span>Local Preview Active • Ready to upload on Save</span>
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-800 border-emerald-300 gap-1 font-semibold py-0.5">
+                          <CheckCircle2 className="size-3 text-emerald-600" />
+                          <span>Cloud Storage WebP Active</span>
+                        </Badge>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-muted-foreground">
+                      PNG, JPG, or WebP up to 15 MB • Automatically optimized to WebP on save
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
