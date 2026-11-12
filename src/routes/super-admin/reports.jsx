@@ -43,6 +43,7 @@ import { subscribeToDashboardKpis } from "@/services/dashboardService";
 import { subscribeToSocieties } from "@/services/societyService";
 import { subscribeToChefs } from "@/services/chefService";
 import { subscribeToOrders } from "@/services/orderService";
+import { subscribeToCustomers } from "@/services/customerService";
 
 export const Route = createFileRoute("/super-admin/reports")({
   component: StatisticsReportsPage,
@@ -72,6 +73,7 @@ export function StatisticsReportsPage() {
   const [societies, setSocieties] = useState([]);
   const [chefs, setChefs] = useState([]);
   const [orders, setOrders] = useState([]);
+  const [customers, setCustomers] = useState([]);
 
   // Collapsible states — collapsed by default as requested
   const [isChefCustomerExpanded, setIsChefCustomerExpanded] = useState(false);
@@ -108,11 +110,16 @@ export function StatisticsReportsPage() {
       setOrders(list || []);
     });
 
+    const unsubCustomers = subscribeToCustomers((list) => {
+      setCustomers(list || []);
+    });
+
     return () => {
       unsubKpis();
       unsubSocs();
       unsubChefs();
       unsubOrders();
+      unsubCustomers();
     };
   }, []);
 
@@ -223,7 +230,7 @@ export function StatisticsReportsPage() {
     return Array.from(new Set(list.map((s) => s.name).filter(Boolean))).sort();
   }, [societies, chefPerfCity, chefPerfArea]);
 
-  // 1. Filtered data for Report 1: Chef / Customer Count per Society (based strictly on chef baseSociety)
+  // 1. Filtered data for Report 1: Chef / Customer Count per Society (based strictly on chef baseSociety & registered customers)
   const filteredChefCustomerSocieties = useMemo(() => {
     return societies
       .filter((s) => {
@@ -238,12 +245,17 @@ export function StatisticsReportsPage() {
           const base = (c.baseSociety || "").trim().toLowerCase();
           return base && (base === socName || base === socId);
         });
+        const baseCustomers = customers.filter((c) => {
+          const custSoc = (c.society || c.societyName || "").trim().toLowerCase();
+          return custSoc && (custSoc === socName || custSoc === socId);
+        });
         return {
           ...s,
           totalChefs: baseChefs.length,
+          totalCustomers: baseCustomers.length,
         };
       });
-  }, [societies, chefs, chefCustCity, chefCustArea]);
+  }, [societies, chefs, customers, chefCustCity, chefCustArea]);
 
   // 2. Filtered data for Report 2: Orders / Revenue per Society (derived from DB orders)
   const filteredOrdersRevenueSocieties = useMemo(() => {

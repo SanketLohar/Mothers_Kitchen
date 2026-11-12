@@ -81,6 +81,7 @@ import {
   subscribeToChefs,
   syncExistingChefsToSocieties,
 } from "@/services/chefService";
+import { subscribeToCustomers } from "@/services/customerService";
 import { createAdminNotification } from "@/services/notificationService";
 
 export const Route = createFileRoute("/super-admin/society")({
@@ -90,6 +91,7 @@ export const Route = createFileRoute("/super-admin/society")({
 export function SocietyManagementPage() {
   const [societies, setSocieties] = useState([]);
   const [chefs, setChefs] = useState([]);
+  const [customers, setCustomers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCity, setSelectedCity] = useState("all");
   const [selectedArea, setSelectedArea] = useState("all");
@@ -111,9 +113,14 @@ export function SocietyManagementPage() {
       setChefs(list || []);
     });
 
+    const unsubCustomers = subscribeToCustomers((list) => {
+      setCustomers(list || []);
+    });
+
     return () => {
       unsubSocieties();
       unsubChefs();
+      unsubCustomers();
     };
   }, []);
 
@@ -129,6 +136,20 @@ export function SocietyManagementPage() {
 
   const getChefCountForSociety = (soc) => {
     return getChefsForSociety(soc).length;
+  };
+
+  const getCustomersForSociety = (soc) => {
+    if (!soc) return [];
+    const socName = (soc.name || "").trim().toLowerCase();
+    const socId = (soc.id || "").trim().toLowerCase();
+    return customers.filter((c) => {
+      const base = (c.society || c.societyName || "").trim().toLowerCase();
+      return base && (base === socName || base === socId);
+    });
+  };
+
+  const getCustomerCountForSociety = (soc) => {
+    return getCustomersForSociety(soc).length;
   };
 
   // Modal States
@@ -515,7 +536,7 @@ export function SocietyManagementPage() {
         "Total Floors": soc.wings?.reduce((a, b) => a + Number(b.floors || 0), 0) || 0,
         "Status": soc.status === "enabled" ? "Enabled" : "Disabled",
         "Registered Cooks": getChefCountForSociety(soc),
-        "Total Customers": soc.totalCustomers || 0,
+        "Total Customers": getCustomerCountForSociety(soc),
       }));
 
       const dateStr = new Date().toISOString().slice(0, 10);
@@ -756,7 +777,9 @@ export function SocietyManagementPage() {
                         {getChefCountForSociety(soc)} registered cooks
                       </span>
                       {" • "}
-                      {soc.totalCustomers || 0} customers
+                      <span className={getCustomerCountForSociety(soc) > 0 ? "font-semibold text-primary" : ""}>
+                        {getCustomerCountForSociety(soc)} {getCustomerCountForSociety(soc) === 1 ? "customer" : "customers"}
+                      </span>
                     </div>
                   </TableCell>
                   <TableCell className="font-medium text-foreground">{toTitleCase(soc.area)}</TableCell>
@@ -1307,6 +1330,41 @@ export function SocietyManagementPage() {
                         <Badge variant={c.status === "enabled" ? "success" : "destructive"} className="text-[9px] py-0 px-1.5">
                           {c.status}
                         </Badge>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Registered Customers in this Society */}
+            <div className="space-y-2 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-muted-foreground uppercase">
+                  Registered Customers ({getCustomerCountForSociety(viewingSociety)}):
+                </span>
+              </div>
+              {getCustomerCountForSociety(viewingSociety) === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No customers registered in this society yet.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {getCustomersForSociety(viewingSociety).map((cust) => (
+                    <div
+                      key={cust.id}
+                      className="p-2 rounded-xl bg-orange-50/70 border border-orange-200/70 text-xs flex justify-between items-center"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-foreground">{cust.fullName || cust.name}</span>
+                        <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-orange-100 text-orange-800 font-semibold">
+                          {cust.id}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">{cust.mobileNumber || cust.phone || "—"}</span>
+                        {cust.wing && (
+                          <Badge variant="outline" className="text-[9px] py-0 px-1.5 font-mono">
+                            Wing {cust.wing}{cust.flatNumber ? `-${cust.flatNumber}` : ""}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   ))}
