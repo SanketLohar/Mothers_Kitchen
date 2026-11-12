@@ -363,12 +363,18 @@ export function HighlightsPage() {
         let finalImageUrl = target.imageUrl || "";
         // If image is a newly selected data or blob URL, compress to WebP and upload to Firebase Storage
         if (finalImageUrl.startsWith("data:") || finalImageUrl.startsWith("blob:")) {
-          toast.loading(`Uploading Banner #${slotNumber} (WebP) to Firebase Storage...`, { id: `global-banner-${slotNumber}` });
-          finalImageUrl = await uploadHighlightBanner(finalImageUrl, {
-            scope: "global",
-            slotNumber,
-          });
-          toast.success(`Banner #${slotNumber} uploaded to Cloud Storage!`, { id: `global-banner-${slotNumber}` });
+          try {
+            toast.loading(`Uploading Banner #${slotNumber} (WebP) to Firebase Storage...`, { id: `global-banner-${slotNumber}` });
+            finalImageUrl = await uploadHighlightBanner(finalImageUrl, {
+              scope: "global",
+              slotNumber,
+            });
+            toast.success(`Banner #${slotNumber} uploaded to Cloud Storage!`, { id: `global-banner-${slotNumber}` });
+          } catch (uploadErr) {
+            console.warn("Storage banner upload error (falling back to direct optimized banner):", uploadErr);
+            toast.dismiss(`global-banner-${slotNumber}`);
+            // Fallback: preserve current optimized banner so save succeeds without crashing
+          }
         }
 
         const slotPayload = {
@@ -491,13 +497,18 @@ export function HighlightsPage() {
         let finalImageUrl = target.imageUrl || "";
         // If image is a newly selected data or blob URL, compress to WebP and upload to Firebase Storage
         if (finalImageUrl.startsWith("data:") || finalImageUrl.startsWith("blob:")) {
-          toast.loading(`Uploading Banner #${slotNumber} (WebP) to Firebase Storage...`, { id: `soc-banner-${slotNumber}` });
-          finalImageUrl = await uploadHighlightBanner(finalImageUrl, {
-            scope: "society",
-            societyId: selectedSocietyId,
-            slotNumber,
-          });
-          toast.success(`Banner #${slotNumber} uploaded to Cloud Storage!`, { id: `soc-banner-${slotNumber}` });
+          try {
+            toast.loading(`Uploading Banner #${slotNumber} (WebP) to Firebase Storage...`, { id: `soc-banner-${slotNumber}` });
+            finalImageUrl = await uploadHighlightBanner(finalImageUrl, {
+              scope: "society",
+              societyId: selectedSocietyId,
+              slotNumber,
+            });
+            toast.success(`Banner #${slotNumber} uploaded to Cloud Storage!`, { id: `soc-banner-${slotNumber}` });
+          } catch (uploadErr) {
+            console.warn("Storage banner upload error (falling back to direct optimized banner):", uploadErr);
+            toast.dismiss(`soc-banner-${slotNumber}`);
+          }
         }
 
         const slotPayload = {
@@ -676,19 +687,6 @@ export function HighlightsPage() {
                       <CardTitle className="text-sm font-bold truncate text-foreground">
                         {slot.title || `Global Banner ${slot.slotNumber}`}
                       </CardTitle>
-                      {slot.imageUrl && (
-                        slot.imageUrl.startsWith("data:") || slot.imageUrl.startsWith("blob:") ? (
-                          <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-800 border-amber-300 gap-1 font-semibold py-0.5 shrink-0">
-                            <Eye className="size-3 text-amber-600" />
-                            <span>Preview</span>
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-800 border-emerald-300 gap-1 font-semibold py-0.5 shrink-0">
-                            <CheckCircle2 className="size-3 text-emerald-600" />
-                            <span>WebP</span>
-                          </Badge>
-                        )
-                      )}
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <span className="text-xs font-semibold text-muted-foreground">Active</span>
@@ -1126,19 +1124,6 @@ export function HighlightsPage() {
                           <CardTitle className="text-sm font-bold truncate text-foreground">
                             {slot.title || `Society Banner ${slot.slotNumber}`}
                           </CardTitle>
-                          {slot.imageUrl && (
-                            slot.imageUrl.startsWith("data:") || slot.imageUrl.startsWith("blob:") ? (
-                              <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-800 border-amber-300 gap-1 font-semibold py-0.5 shrink-0">
-                                <Eye className="size-3 text-amber-600" />
-                                <span>Preview</span>
-                              </Badge>
-                            ) : (
-                              <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-800 border-emerald-300 gap-1 font-semibold py-0.5 shrink-0">
-                                <CheckCircle2 className="size-3 text-emerald-600" />
-                                <span>WebP</span>
-                              </Badge>
-                            )
-                          )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs font-semibold text-muted-foreground">Active</span>

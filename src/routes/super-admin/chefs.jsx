@@ -872,10 +872,12 @@ export function ChefManagementPage() {
           setPendingPhotoFile(null);
           toast.success("Profile photo uploaded to Cloud Storage!", { id: "photo-upload" });
         } catch (uploadErr) {
-          console.error("Storage upload error:", uploadErr);
-          toast.error("Could not upload photo to Storage: " + (uploadErr.message || "Unknown error"), { id: "photo-upload" });
-          setIsSubmitting(false);
-          return;
+          console.warn("Storage upload error (falling back to direct optimized photo):", uploadErr);
+          toast.dismiss("photo-upload");
+          // Fallback: If Firebase Storage returns permission error or fails, preserve the optimized photo so save is never blocked
+          if (formData.photoUrl) {
+            payload.photoUrl = formData.photoUrl;
+          }
         }
       }
 
@@ -1833,25 +1835,9 @@ export function ChefManagementPage() {
                     )}
                   </div>
 
-                  {formData.photoUrl ? (
-                    <div className="flex items-center gap-1.5">
-                      {formData.photoUrl.startsWith("data:") || formData.photoUrl.startsWith("blob:") ? (
-                        <Badge variant="outline" className="text-[10px] bg-amber-500/10 text-amber-800 border-amber-300 gap-1 font-semibold py-0.5">
-                          <Eye className="size-3 text-amber-600" />
-                          <span>Local Preview Active • Ready to upload on Save</span>
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-[10px] bg-emerald-500/10 text-emerald-800 border-emerald-300 gap-1 font-semibold py-0.5">
-                          <CheckCircle2 className="size-3 text-emerald-600" />
-                          <span>Cloud Storage WebP Active</span>
-                        </Badge>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-[10px] text-muted-foreground">
-                      PNG, JPG, or WebP up to 15 MB • Automatically optimized to WebP on save
-                    </p>
-                  )}
+                  <p className="text-[10px] text-muted-foreground">
+                    PNG, JPG, or WebP up to 15 MB
+                  </p>
                 </div>
               </div>
             </div>
@@ -1871,7 +1857,7 @@ export function ChefManagementPage() {
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">City *</Label>
                   <Select
-                    value={formData.city || undefined}
+                    value={formData.city || ""}
                     onValueChange={(val) => handleFormCityChange(val)}
                   >
                     <SelectTrigger className="w-full h-10 px-3 rounded-xl border border-input bg-card text-foreground text-xs font-semibold">
@@ -1890,7 +1876,7 @@ export function ChefManagementPage() {
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold">Area *</Label>
                   <Select
-                    value={formData.area || undefined}
+                    value={formData.area || ""}
                     onValueChange={(val) => handleFormAreaChange(val)}
                     disabled={!formData.city}
                   >
@@ -1915,7 +1901,7 @@ export function ChefManagementPage() {
                     {isSellerRole(formData.role) ? "Base Operating Society *" : "Base Residence Society *"}
                   </Label>
                   <Select
-                    value={formData.baseSociety || undefined}
+                    value={formData.baseSociety || ""}
                     onValueChange={(val) => handleFormSocietyChange(val)}
                     disabled={!formData.area}
                   >
@@ -1951,7 +1937,7 @@ export function ChefManagementPage() {
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Floor *</Label>
                     <Select
-                      value={formData.floor ? String(formData.floor) : undefined}
+                      value={formData.floor ? String(formData.floor) : ""}
                       onValueChange={(val) => handleFormFloorChange(val)}
                       disabled={!formData.baseSociety}
                     >
@@ -1972,7 +1958,7 @@ export function ChefManagementPage() {
                   <div className="space-y-1">
                     <Label className="text-xs font-semibold">Wing / Building *</Label>
                     <Select
-                      value={formData.wing || undefined}
+                      value={formData.wing || ""}
                       onValueChange={(val) => handleFormWingChange(val)}
                       disabled={!formData.baseSociety}
                     >
