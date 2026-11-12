@@ -60,9 +60,19 @@ function parseOrderDate(order) {
 }
 
 export function StatisticsReportsPage() {
+  const todayYMD = useMemo(() => {
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Kolkata",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  }, []);
+  const monthStartYMD = useMemo(() => `${todayYMD.slice(0, 7)}-01`, [todayYMD]);
+
   const [selectedPeriod, setSelectedPeriod] = useState("this_month");
-  const [customStartDate, setCustomStartDate] = useState("2026-10-01");
-  const [customEndDate, setCustomEndDate] = useState("2026-10-31");
+  const [customStartDate, setCustomStartDate] = useState(monthStartYMD);
+  const [customEndDate, setCustomEndDate] = useState(todayYMD);
   const [stats, setStats] = useState({
     totalSocieties: 0,
     totalChefs: 0,
