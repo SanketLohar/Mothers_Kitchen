@@ -65,6 +65,10 @@ export async function saveHighlightSlot(slotNumber, data) {
     throw new Error("Firebase is not configured.");
   }
 
+  if (data.imageUrl && data.imageUrl.startsWith("data:")) {
+    throw new Error("Base64 images cannot be saved directly to Firestore. Please upload to Cloud Storage.");
+  }
+
   const docRef = doc(db, COLLECTION_NAME, `slot-${slotNumber}`);
   return await setDoc(
     docRef,
@@ -137,6 +141,10 @@ export async function saveSocietyHighlightSlot(societyId, slotNumber, data) {
   }
   if (!societyId) {
     throw new Error("Society ID is required.");
+  }
+
+  if (data.imageUrl && data.imageUrl.startsWith("data:")) {
+    throw new Error("Base64 images cannot be saved directly to Firestore. Please upload to Cloud Storage.");
   }
 
   const docRef = doc(db, "societies", societyId, "highlights", `slot-${slotNumber}`);

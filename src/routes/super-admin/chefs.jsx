@@ -523,9 +523,12 @@ export function ChefManagementPage() {
           const ctx = canvas.getContext("2d");
           ctx.drawImage(img, 0, 0, width, height);
 
-          // 0.8 JPEG quality gives crisp avatar quality with typical size ~25-45 KB
-          const compressed = canvas.toDataURL("image/jpeg", 0.8);
-          resolve(compressed);
+          // High efficiency WebP compression for crisp avatar preview ~20-35 KB
+          try {
+            resolve(canvas.toDataURL("image/webp", 0.85));
+          } catch {
+            resolve(canvas.toDataURL("image/jpeg", 0.85));
+          }
         };
         img.src = e.target.result;
       };
@@ -872,13 +875,19 @@ export function ChefManagementPage() {
           setPendingPhotoFile(null);
           toast.success("Photo uploaded successfully!", { id: "photo-upload" });
         } catch (uploadErr) {
-          console.warn("Storage upload error (falling back to direct optimized photo):", uploadErr);
+          console.error("Storage upload error:", uploadErr);
           toast.dismiss("photo-upload");
-          // Fallback: If Firebase Storage returns permission error or fails, preserve the optimized photo so save is never blocked
-          if (formData.photoUrl) {
-            payload.photoUrl = formData.photoUrl;
-          }
+          toast.error("Failed to upload photo to Cloud Storage: " + (uploadErr.message || "Please check storage permissions."));
+          setIsSubmitting(false);
+          return;
         }
+      }
+
+      // Strict Invariant: Never allow base64 strings to be stored into Firestore
+      if (payload.photoUrl && payload.photoUrl.startsWith("data:")) {
+        toast.error("Image must be uploaded to Cloud Storage. Base64 is not permitted in the database.");
+        setIsSubmitting(false);
+        return;
       }
 
       if (editingChef) {

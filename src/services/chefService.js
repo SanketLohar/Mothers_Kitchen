@@ -287,6 +287,10 @@ export async function createChef(data) {
     throw new Error("Firebase is not configured.");
   }
 
+  if (data.photoUrl && data.photoUrl.startsWith("data:")) {
+    throw new Error("Base64 photos cannot be saved directly to Firestore. Please upload to Cloud Storage.");
+  }
+
   const role = data.role === "marketplace" ? "seller" : (data.role || "chef");
   const userId = data.id || await getNextUserId(role);
   const userRef = doc(db, COLLECTION_NAME, userId);
@@ -353,6 +357,10 @@ export async function createChef(data) {
 export async function updateChef(chefId, data) {
   if (!isFirebaseConfigured || !db) {
     throw new Error("Firebase is not configured.");
+  }
+
+  if (data.photoUrl && data.photoUrl.startsWith("data:")) {
+    throw new Error("Base64 photos cannot be saved directly to Firestore. Please upload to Cloud Storage.");
   }
 
   const docRef = doc(db, COLLECTION_NAME, chefId);

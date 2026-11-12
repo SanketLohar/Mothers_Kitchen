@@ -335,6 +335,12 @@ export function HighlightsPage() {
   const handleToggleGlobalActive = async (slotNumber) => {
     const target = highlights.find((h) => h.slotNumber === slotNumber);
     if (!target) return;
+
+    if (target.isDirty || (target.imageUrl && target.imageUrl.startsWith("data:"))) {
+      toast.error("Please click 'Save Banner Changes' first before toggling status.");
+      return;
+    }
+
     const next = !target.isActive;
     const updated = { ...target, isActive: next };
 
@@ -371,10 +377,19 @@ export function HighlightsPage() {
             });
             toast.success("Banner uploaded successfully!", { id: `global-banner-${slotNumber}` });
           } catch (uploadErr) {
-            console.warn("Storage banner upload error (falling back to direct optimized banner):", uploadErr);
+            console.error("Storage banner upload error:", uploadErr);
             toast.dismiss(`global-banner-${slotNumber}`);
-            // Fallback: preserve current optimized banner so save succeeds without crashing
+            toast.error("Failed to upload banner to Cloud Storage: " + (uploadErr.message || "Please check storage permissions."));
+            setSavingSlot(null);
+            return;
           }
+        }
+
+        // Strict Invariant: Never allow base64 strings to be stored into Firestore
+        if (finalImageUrl && finalImageUrl.startsWith("data:")) {
+          toast.error("Image must be uploaded to Cloud Storage. Base64 is not permitted in the database.");
+          setSavingSlot(null);
+          return;
         }
 
         const slotPayload = {
@@ -464,6 +479,12 @@ export function HighlightsPage() {
     if (!selectedSocietyId) return;
     const target = societyHighlights.find((h) => h.slotNumber === slotNumber);
     if (!target) return;
+
+    if (target.isDirty || (target.imageUrl && target.imageUrl.startsWith("data:"))) {
+      toast.error("Please click 'Save Banner Changes' first before toggling status.");
+      return;
+    }
+
     const next = !target.isActive;
     const updated = { ...target, isActive: next };
 
@@ -506,9 +527,19 @@ export function HighlightsPage() {
             });
             toast.success("Banner uploaded successfully!", { id: `soc-banner-${slotNumber}` });
           } catch (uploadErr) {
-            console.warn("Storage banner upload error (falling back to direct optimized banner):", uploadErr);
+            console.error("Storage banner upload error:", uploadErr);
             toast.dismiss(`soc-banner-${slotNumber}`);
+            toast.error("Failed to upload banner to Cloud Storage: " + (uploadErr.message || "Please check storage permissions."));
+            setSavingSocietySlot(null);
+            return;
           }
+        }
+
+        // Strict Invariant: Never allow base64 strings to be stored into Firestore
+        if (finalImageUrl && finalImageUrl.startsWith("data:")) {
+          toast.error("Image must be uploaded to Cloud Storage. Base64 is not permitted in the database.");
+          setSavingSocietySlot(null);
+          return;
         }
 
         const slotPayload = {
