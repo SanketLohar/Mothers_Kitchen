@@ -549,7 +549,7 @@ export function ChefManagementPage() {
       setPendingPhotoFile(file);
       const compressedDataUrl = await compressImage(file);
       setFormData((prev) => ({ ...prev, photoUrl: compressedDataUrl }));
-      toast.success("Photo attached & preview ready! Will be uploaded as WebP on save.");
+      toast.success("Photo attached successfully!");
     } catch (err) {
       console.error("Error processing photo:", err);
       toast.error("Failed to process photo. Please try a different image.");
@@ -861,7 +861,7 @@ export function ChefManagementPage() {
 
       if (shouldUploadPhoto && isFirebaseConfigured) {
         try {
-          toast.loading("Uploading & optimizing photo (WebP) to Firebase Storage...", { id: "photo-upload" });
+          toast.loading("Uploading photo...", { id: "photo-upload" });
           const targetUserId = editingChef
             ? editingChef.id
             : (await getNextUserId(isSeller ? "seller" : "chef"));
@@ -870,7 +870,7 @@ export function ChefManagementPage() {
           payload.photoUrl = storageUrl;
           setFormData((prev) => ({ ...prev, photoUrl: storageUrl }));
           setPendingPhotoFile(null);
-          toast.success("Profile photo uploaded to Cloud Storage!", { id: "photo-upload" });
+          toast.success("Photo uploaded successfully!", { id: "photo-upload" });
         } catch (uploadErr) {
           console.warn("Storage upload error (falling back to direct optimized photo):", uploadErr);
           toast.dismiss("photo-upload");

@@ -364,12 +364,12 @@ export function HighlightsPage() {
         // If image is a newly selected data or blob URL, compress to WebP and upload to Firebase Storage
         if (finalImageUrl.startsWith("data:") || finalImageUrl.startsWith("blob:")) {
           try {
-            toast.loading(`Uploading Banner #${slotNumber} (WebP) to Firebase Storage...`, { id: `global-banner-${slotNumber}` });
+            toast.loading("Uploading banner...", { id: `global-banner-${slotNumber}` });
             finalImageUrl = await uploadHighlightBanner(finalImageUrl, {
               scope: "global",
               slotNumber,
             });
-            toast.success(`Banner #${slotNumber} uploaded to Cloud Storage!`, { id: `global-banner-${slotNumber}` });
+            toast.success("Banner uploaded successfully!", { id: `global-banner-${slotNumber}` });
           } catch (uploadErr) {
             console.warn("Storage banner upload error (falling back to direct optimized banner):", uploadErr);
             toast.dismiss(`global-banner-${slotNumber}`);
@@ -441,7 +441,7 @@ export function HighlightsPage() {
         prev.map((h) => (h.slotNumber === slotNumber ? updatedSlot : h))
       );
 
-      toast.info(`Image selected for Global Banner #${slotNumber}. Click "Save Banner Changes" to apply.`);
+      toast.success(`Banner #${slotNumber} attached! Click Save to apply.`);
     } catch (err) {
       console.error("Banner upload error:", err);
       toast.error("Failed to process image. Please try again.");
@@ -456,7 +456,7 @@ export function HighlightsPage() {
     setHighlights((prev) =>
       prev.map((h) => (h.slotNumber === slotNumber ? updated : h))
     );
-    toast.info(`Image removed from Global Banner #${slotNumber}. Click "Save Banner Changes" to apply.`);
+    toast.info(`Banner #${slotNumber} removed. Click Save to apply.`);
   };
 
   // --- SOCIETY SPECIFIC HIGHLIGHT HANDLERS ---
@@ -498,13 +498,13 @@ export function HighlightsPage() {
         // If image is a newly selected data or blob URL, compress to WebP and upload to Firebase Storage
         if (finalImageUrl.startsWith("data:") || finalImageUrl.startsWith("blob:")) {
           try {
-            toast.loading(`Uploading Banner #${slotNumber} (WebP) to Firebase Storage...`, { id: `soc-banner-${slotNumber}` });
+            toast.loading("Uploading banner...", { id: `soc-banner-${slotNumber}` });
             finalImageUrl = await uploadHighlightBanner(finalImageUrl, {
               scope: "society",
               societyId: selectedSocietyId,
               slotNumber,
             });
-            toast.success(`Banner #${slotNumber} uploaded to Cloud Storage!`, { id: `soc-banner-${slotNumber}` });
+            toast.success("Banner uploaded successfully!", { id: `soc-banner-${slotNumber}` });
           } catch (uploadErr) {
             console.warn("Storage banner upload error (falling back to direct optimized banner):", uploadErr);
             toast.dismiss(`soc-banner-${slotNumber}`);
@@ -581,7 +581,7 @@ export function HighlightsPage() {
         prev.map((h) => (h.slotNumber === slotNumber ? updatedSlot : h))
       );
 
-      toast.info(`Image selected for Banner #${slotNumber}. Click "Save Banner Changes" to apply.`);
+      toast.success(`Banner #${slotNumber} attached! Click Save to apply.`);
     } catch (err) {
       console.error("Society banner upload error:", err);
       toast.error("Failed to process image. Please try again.");
@@ -597,7 +597,7 @@ export function HighlightsPage() {
     setSocietyHighlights((prev) =>
       prev.map((h) => (h.slotNumber === slotNumber ? updated : h))
     );
-    toast.info(`Image removed from Banner #${slotNumber}. Click "Save Banner Changes" to apply.`);
+    toast.info(`Banner #${slotNumber} removed. Click Save to apply.`);
   };
 
   // Active highlights list for mobile preview based on selected scope
@@ -1371,13 +1371,7 @@ export function HighlightsPage() {
           </div>
 
           <div className="flex items-center justify-between text-xs text-muted-foreground pt-1">
-            <span className="text-[11px]">
-              {inspectingBanner?.url?.startsWith("data:") || inspectingBanner?.url?.startsWith("blob:") ? (
-                <span className="text-amber-700 font-medium">Local WebP Preview • Ready to save to Firebase Storage</span>
-              ) : (
-                <span className="text-emerald-700 font-medium">Active Firebase Cloud Storage WebP Asset</span>
-              )}
-            </span>
+            <span className="text-[11px]">Recommended display: 1080 x 540 px</span>
             <Button
               variant="outline"
               size="sm"
