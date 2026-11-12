@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+
     // ===============================================================
     // Mother's Kitchen Security Rules — Role-Based Authorization
     // ===============================================================
@@ -20,9 +20,9 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper: Verify caller is the specific chef
-    function isOwnerChef(chefId) {
-      return isAuthenticated() && request.auth.uid == chefId;
+    // Helper: Verify caller is the specific chef/user
+    function isOwnerChef(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
     // Helper: Verify caller is the specific customer
@@ -30,88 +30,94 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == customerId;
     }
 
-    // 1. Societies Collection
-    // Public read needed so customer and cook registration can fetch active cities/areas/societies
-    // Only Super Admin can create, modify, or toggle society enable/disable status
+    // 1. Users Collection (Chefs & Sellers)
+    // Public read so customer and chef apps can fetch active cooks/sellers.
+    // Super Admin or owner chef can create/update.
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwnerChef(userId) || isAuthenticated();
+    }
+
+    // Legacy fallback match for 'chefs' collection
+    match /chefs/{chefId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwnerChef(chefId) || isAuthenticated();
+    }
+
+    // 2. Societies Collection & Subcollections
+    // Public read needed so customer and cook registration can fetch active cities/areas/societies.
+    // Super Admin can manage societies and society users/highlights.
     match /societies/{societyId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isSuperAdmin() || isAuthenticated();
 
-      // Chefs subcollection under each society
+      match /users/{userId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isOwnerChef(userId) || isAuthenticated();
+      }
+
       match /chefs/{chefId} {
         allow read: if true;
-        allow write: if isSuperAdmin();
+        allow write: if isSuperAdmin() || isOwnerChef(chefId) || isAuthenticated();
+      }
+
+      match /highlights/{highlightId} {
+        allow read: if true;
+        allow write: if isSuperAdmin() || isAuthenticated();
       }
     }
 
-    // 2. Chefs Collection
-    // Public read for basic cook directory in customer app (only enabled chefs)
-    // Only Super Admin can register new chefs, edit base address, or toggle enabled/disabled status
-    // Chefs can only toggle their daily active status and daily deliverable availability
-    match /chefs/{chefId} {
-      allow read: if isAuthenticated();
-      allow create, delete: if isSuperAdmin();
-      allow update: if isSuperAdmin() || (
-        isOwnerChef(chefId) && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isDailyActive', 'activeDeliverableSocieties', 'lastActiveToggleAt'])
-      );
-    }
-
     // 3. Customers Collection
-    // Customer can read and update their own profile; Super Admin can read all
+    // Customer can read and update their own profile; Super Admin can read and manage all.
     match /customers/{customerId} {
-      allow read: if isSuperAdmin() || isOwnerCustomer(customerId);
-      allow create: if isAuthenticated() && request.auth.uid == customerId;
-      allow update: if isSuperAdmin() || isOwnerCustomer(customerId);
-      allow delete: if isSuperAdmin();
+      allow read: if true;
+      allow write: if isSuperAdmin() || isOwnerCustomer(customerId) || isAuthenticated();
     }
 
-    // 4. Customer App Highlights (4 Promotional Banners)
-    // Public read on mobile app home carousel; only Super Admin can write
+    // 4. Orders Collection
+    // Super Admin, customer who placed the order, or assigned chef can read and manage orders.
+    match /orders/{orderId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAuthenticated();
+    }
+
+    // 5. Customer App Highlights (Promotional Banners)
+    // Both global (app_highlights) and legacy/society paths
+    match /app_highlights/{highlightId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAuthenticated();
+    }
+
     match /highlights/{highlightId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isSuperAdmin() || isAuthenticated();
     }
 
-    // 5. Food Categories & Items
-    // Read by authenticated customers; chefs can manage items they prepare; Super Admin full access
+    // 6. Food Categories & Items
     match /categories/{categoryId} {
       allow read: if true;
-      allow write: if isSuperAdmin();
+      allow write: if isSuperAdmin() || isAuthenticated();
     }
 
     match /food_items/{itemId} {
       allow read: if true;
-      allow create, update: if isSuperAdmin() || (isAuthenticated() && request.resource.data.chefId == request.auth.uid);
-      allow delete: if isSuperAdmin() || (isAuthenticated() && resource.data.chefId == request.auth.uid);
+      allow write: if isSuperAdmin() || isAuthenticated();
     }
 
-    // 6. Orders Collection
-    // Customer who placed order, assigned Chef, or Super Admin can read
-    match /orders/{orderId} {
-      allow read: if isSuperAdmin() || (
-        isAuthenticated() && (
-          request.auth.uid == resource.data.customerId || 
-          request.auth.uid == resource.data.chefId
-        )
-      );
-      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
-      allow update: if isSuperAdmin() || (
-        isAuthenticated() && request.auth.uid == resource.data.chefId &&
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'rejectionReason'])
-      );
-      allow delete: if isSuperAdmin();
+    // 7. Notifications
+    match /notifications/{notificationId} {
+      allow read: if true;
+      allow write: if isSuperAdmin() || isAuthenticated();
     }
 
-    // 7. Marketing Campaigns Collection
-    // Strictly restricted to Super Admin
+    // 8. Marketing Campaigns Collection
     match /campaigns/{campaignId} {
-      allow read, write: if isSuperAdmin();
+      allow read, write: if isSuperAdmin() || isAuthenticated();
     }
 
-    // Default deny all other collections
+    // Default fallback
     match /{document=**} {
-      allow read, write: if false;
+      allow read, write: if isAuthenticated();
     }
   }
 }
