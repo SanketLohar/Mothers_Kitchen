@@ -396,21 +396,6 @@ export async function updateChef(chefId, data) {
     assignedSocieties.some((as) => (as || "").trim().toLowerCase() === (s || "").trim().toLowerCase())
   );
 
-  // Also clean up societyDeliveryStatus toggle map
-  const sanitizedDeliveryStatus = {};
-  if (existingDeliveryStatus && typeof existingDeliveryStatus === "object") {
-    Object.entries(existingDeliveryStatus).forEach(([key, val]) => {
-      const isApproved = assignedSocieties.some(
-        (as) =>
-          (as || "").trim().toLowerCase() === (key || "").trim().toLowerCase() ||
-          `soc_${as.trim().toLowerCase().replace(/\s+/g, "_")}` === key.toLowerCase()
-      );
-      if (isApproved) {
-        sanitizedDeliveryStatus[key] = val;
-      }
-    });
-  }
-
   const updatePayload = {
     fullName: data.fullName.trim(),
     name: data.fullName.trim(),
@@ -422,8 +407,6 @@ export async function updateChef(chefId, data) {
     baseSociety,
     assignedSocieties,
     activeDeliverableSocieties: sanitizedActive,
-    deliverableSocieties: sanitizedActive,
-    societyDeliveryStatus: sanitizedDeliveryStatus,
     idCardNumber: data.idCardNumber?.trim() || "",
     photoUrl: data.photoUrl || "",
     idCardUrl: data.idCardUrl || "",
