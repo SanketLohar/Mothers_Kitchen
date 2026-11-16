@@ -47,6 +47,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { toTitleCase } from "@/lib/utils";
 import { isFirebaseConfigured } from "@/lib/firebase";
 import { subscribeToSocieties } from "@/services/societyService";
 import { subscribeToCustomers } from "@/services/customerService";
