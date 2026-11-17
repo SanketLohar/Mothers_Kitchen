@@ -185,7 +185,7 @@ export function HighlightsPage() {
     const configuredIds = Object.keys(configuredSocietiesMap);
     return configuredIds
       .map((socId) => {
-        const matchingSoc = societiesList.find((s) => s.id === socId);
+        const matchingSoc = societiesList.find((s) => s.id === socId || s.name === socId);
         const slots = configuredSocietiesMap[socId] || [];
         const liveSlots = slots.filter((x) => x.isActive && x.imageUrl);
         const uploadedSlots = slots.filter((x) => x.imageUrl || x.title);
@@ -209,6 +209,15 @@ export function HighlightsPage() {
         return (a.name || "").localeCompare(b.name || "");
       });
   }, [societiesList, configuredSocietiesMap]);
+
+  // Filter societies with highlights based on selected City and Area
+  const filteredSocietiesWithHighlights = useMemo(() => {
+    return societiesWithHighlights.filter((s) => {
+      const matchCity = selectedCity === "all" || (s.city || "").toLowerCase() === selectedCity.toLowerCase();
+      const matchArea = selectedArea === "all" || (s.area || "").toLowerCase() === selectedArea.toLowerCase();
+      return matchCity && matchArea;
+    });
+  }, [societiesWithHighlights, selectedCity, selectedArea]);
 
   // Currently selected society object
   const activeSociety = useMemo(() => {
@@ -275,11 +284,13 @@ export function HighlightsPage() {
     setSelectedCity(city);
     setSelectedArea("all");
     setSelectedSocietyId("");
+    setIsHighlightsListOpen(true);
   };
 
   const handleAreaChange = (area) => {
     setSelectedArea(area);
     setSelectedSocietyId("");
+    setIsHighlightsListOpen(true);
   };
 
   const handleSocietyChange = (societyId) => {
@@ -866,7 +877,7 @@ export function HighlightsPage() {
                 isHighlightsListOpen ? "pb-3 border-b border-border/60" : ""
               }`}
             >
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="size-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
                     <Sparkles className="size-4" />
@@ -876,11 +887,12 @@ export function HighlightsPage() {
                       <CardTitle className="text-sm font-bold truncate">Societies with Highlights</CardTitle>
                       {societiesWithHighlights.length > 0 && (
                         <Badge variant="outline" className="text-[11px] px-2 py-0 border-emerald-500/30 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 font-semibold">
-                          {societiesWithHighlights.filter((s) => s.hasLive).length} Live
+                          {filteredSocietiesWithHighlights.filter((s) => s.hasLive).length} Live
                         </Badge>
                       )}
                       <span className="text-[11px] text-muted-foreground font-medium">
-                        ({societiesWithHighlights.length} total)
+                        ({filteredSocietiesWithHighlights.length}
+                        {filteredSocietiesWithHighlights.length !== societiesWithHighlights.length ? ` of ${societiesWithHighlights.length}` : ""} total)
                       </span>
                     </div>
                     <CardDescription className="text-xs truncate hidden sm:block">
@@ -889,12 +901,71 @@ export function HighlightsPage() {
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                {/* City & Area Filters and Actions */}
+                <div
+                  className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* City Select */}
+                  <div className="w-32 sm:w-36">
+                    <Select value={selectedCity} onValueChange={handleCityChange}>
+                      <SelectTrigger className="h-8 text-xs bg-background/80 border-border">
+                        <SelectValue placeholder="All Cities" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Cities</SelectItem>
+                        {availableCities.map((c) => (
+                          <SelectItem key={c} value={c}>
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Area Select */}
+                  <div className="w-32 sm:w-36">
+                    <Select value={selectedArea} onValueChange={handleAreaChange}>
+                      <SelectTrigger className="h-8 text-xs bg-background/80 border-border">
+                        <SelectValue placeholder="All Areas" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Areas</SelectItem>
+                        {availableAreas.map((a) => (
+                          <SelectItem key={a} value={a}>
+                            {a}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Reset Filter Button */}
+                  {(selectedCity !== "all" || selectedArea !== "all") && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCity("all");
+                        setSelectedArea("all");
+                      }}
+                      className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                      title="Reset filters"
+                    >
+                      Clear
+                    </Button>
+                  )}
+
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="h-8 px-2.5 text-xs font-semibold gap-1.5 pointer-events-none text-muted-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsHighlightsListOpen((prev) => !prev);
+                    }}
+                    className="h-8 px-2.5 text-xs font-semibold gap-1.5 text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
                   >
                     <span>{isHighlightsListOpen ? "Collapse" : "View"}</span>
                     <ChevronDown className={`size-4 transition-transform duration-200 ${isHighlightsListOpen ? "rotate-180" : ""}`} />
@@ -906,82 +977,103 @@ export function HighlightsPage() {
             {isHighlightsListOpen && (
               <CardContent className="p-4 pt-3">
                 {societiesWithHighlights.length > 0 ? (
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap gap-2.5">
-                      {(showAllConfiguredSocieties
-                        ? societiesWithHighlights
-                        : societiesWithHighlights.slice(0, 8)
-                      ).map((soc) => {
-                        const isSelected = selectedSocietyId === soc.id;
-                        return (
-                          <button
-                            key={soc.id}
-                            type="button"
-                            onClick={() => handleSocietyChange(soc.id)}
-                            className={`group flex items-center gap-2.5 px-3.5 py-2 rounded-xl border text-left transition-all cursor-pointer ${
-                              isSelected
-                                ? "bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20"
-                                : "bg-background/80 hover:bg-muted/80 border-border hover:border-primary/50 text-foreground"
-                            }`}
-                          >
-                            <Building2 className={`size-4 shrink-0 ${isSelected ? "text-primary-foreground" : "text-muted-foreground group-hover:text-primary"}`} />
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-bold truncate max-w-[150px] sm:max-w-[200px]">
-                                  {soc.name}
+                  filteredSocietiesWithHighlights.length > 0 ? (
+                    <div className="space-y-3">
+                      <div className="flex flex-wrap gap-2.5">
+                        {(showAllConfiguredSocieties
+                          ? filteredSocietiesWithHighlights
+                          : filteredSocietiesWithHighlights.slice(0, 8)
+                        ).map((soc) => {
+                          const isSelected = selectedSocietyId === soc.id;
+                          return (
+                            <button
+                              key={soc.id}
+                              type="button"
+                              onClick={() => handleSocietyChange(soc.id)}
+                              className={`group flex items-center gap-2.5 px-3.5 py-2 rounded-xl border text-left transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20"
+                                  : "bg-background/80 hover:bg-muted/80 border-border hover:border-primary/50 text-foreground"
+                              }`}
+                            >
+                              <Building2 className={`size-4 shrink-0 ${isSelected ? "text-primary-foreground" : "text-muted-foreground group-hover:text-primary"}`} />
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold truncate max-w-[150px] sm:max-w-[200px]">
+                                    {soc.name}
+                                  </span>
+                                  {soc.hasLive ? (
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
+                                      isSelected
+                                        ? "bg-white/20 text-white"
+                                        : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
+                                    }`}>
+                                      ● {soc.liveCount} Live
+                                    </span>
+                                  ) : (
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
+                                      isSelected
+                                        ? "bg-white/20 text-white"
+                                        : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
+                                    }`}>
+                                      Paused
+                                    </span>
+                                  )}
+                                </div>
+                                <span className={`text-[10px] block truncate ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                                  {soc.area ? `${soc.area}, ${soc.city || ""}` : soc.city || "Society"}
                                 </span>
-                                {soc.hasLive ? (
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold ${
-                                    isSelected
-                                      ? "bg-white/20 text-white"
-                                      : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"
-                                  }`}>
-                                    ● {soc.liveCount} Live
-                                  </span>
-                                ) : (
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold ${
-                                    isSelected
-                                      ? "bg-white/20 text-white"
-                                      : "bg-amber-500/15 text-amber-600 dark:text-amber-400"
-                                  }`}>
-                                    Paused
-                                  </span>
-                                )}
                               </div>
-                              <span className={`text-[10px] block truncate ${isSelected ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
-                                {soc.area ? `${soc.area}, ${soc.city || ""}` : soc.city || "Society"}
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Show More / Show Less Toggle Button */}
-                    {societiesWithHighlights.length > 8 && (
-                      <div className="pt-1">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setShowAllConfiguredSocieties((prev) => !prev)}
-                          className="h-8 text-xs font-semibold gap-1.5 rounded-lg border-dashed hover:border-primary cursor-pointer text-muted-foreground hover:text-foreground"
-                        >
-                          {showAllConfiguredSocieties ? (
-                            <>
-                              <span>Show Less</span>
-                              <ChevronUp className="size-3.5" />
-                            </>
-                          ) : (
-                            <>
-                              <span>Show More (+{societiesWithHighlights.length - 8} more societies)</span>
-                              <ChevronDown className="size-3.5" />
-                            </>
-                          )}
-                        </Button>
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
-                  </div>
+
+                      {/* Show More / Show Less Toggle Button */}
+                      {filteredSocietiesWithHighlights.length > 8 && (
+                        <div className="pt-1">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowAllConfiguredSocieties((prev) => !prev)}
+                            className="h-8 text-xs font-semibold gap-1.5 rounded-lg border-dashed hover:border-primary cursor-pointer text-muted-foreground hover:text-foreground"
+                          >
+                            {showAllConfiguredSocieties ? (
+                              <>
+                                <span>Show Less</span>
+                                <ChevronUp className="size-3.5" />
+                              </>
+                            ) : (
+                              <>
+                                <span>Show More (+{filteredSocietiesWithHighlights.length - 8} more societies)</span>
+                                <ChevronDown className="size-3.5" />
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-dashed border-border/80 text-xs text-muted-foreground">
+                      <div className="flex items-center gap-2">
+                        <Info className="size-4 shrink-0 text-muted-foreground" />
+                        <span>No societies with highlights found for {selectedArea !== "all" ? selectedArea : selectedCity}.</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedCity("all");
+                          setSelectedArea("all");
+                        }}
+                        className="h-7 text-xs text-primary hover:text-primary/80 font-semibold px-2.5 cursor-pointer"
+                      >
+                        Reset Filter
+                      </Button>
+                    </div>
+                  )
                 ) : (
                   <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
                     <Info className="size-4 shrink-0 text-muted-foreground" />
