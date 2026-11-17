@@ -89,6 +89,10 @@ export function HighlightsPage() {
   const [configuredSocietiesMap, setConfiguredSocietiesMap] = useState({});
   const autoSelectedRef = useRef(false);
 
+  // Quick-access bar independent filters for "Societies with Highlights"
+  const [quickFilterCity, setQuickFilterCity] = useState("all");
+  const [quickFilterArea, setQuickFilterArea] = useState("all");
+
   // Dropdown collapse/expand and Show More state for configured societies list
   const [isHighlightsListOpen, setIsHighlightsListOpen] = useState(false);
   const [showAllConfiguredSocieties, setShowAllConfiguredSocieties] = useState(false);
@@ -210,14 +214,39 @@ export function HighlightsPage() {
       });
   }, [societiesList, configuredSocietiesMap]);
 
-  // Filter societies with highlights based on selected City and Area
+  // Distinct areas for Quick-Access Bar filtered by quickFilterCity
+  const quickFilterAvailableAreas = useMemo(() => {
+    const filtered = quickFilterCity === "all"
+      ? societiesList
+      : societiesList.filter((s) => (s.city || "").toLowerCase() === quickFilterCity.toLowerCase());
+    return Array.from(new Set(filtered.map((s) => s.area).filter(Boolean))).sort();
+  }, [societiesList, quickFilterCity]);
+
+  // Filter societies with highlights based on independent quick-access City and Area filters (defaults to "all")
   const filteredSocietiesWithHighlights = useMemo(() => {
     return societiesWithHighlights.filter((s) => {
-      const matchCity = selectedCity === "all" || (s.city || "").toLowerCase() === selectedCity.toLowerCase();
-      const matchArea = selectedArea === "all" || (s.area || "").toLowerCase() === selectedArea.toLowerCase();
+      const matchCity = quickFilterCity === "all" || (s.city || "").toLowerCase() === quickFilterCity.toLowerCase();
+      const matchArea = quickFilterArea === "all" || (s.area || "").toLowerCase() === quickFilterArea.toLowerCase();
       return matchCity && matchArea;
     });
-  }, [societiesWithHighlights, selectedCity, selectedArea]);
+  }, [societiesWithHighlights, quickFilterCity, quickFilterArea]);
+
+  // Quick-access bar change handlers
+  const handleQuickCityChange = (city) => {
+    setQuickFilterCity(city);
+    setQuickFilterArea("all");
+    setIsHighlightsListOpen(true);
+  };
+
+  const handleQuickAreaChange = (area) => {
+    setQuickFilterArea(area);
+    setIsHighlightsListOpen(true);
+  };
+
+  const handleResetQuickFilter = () => {
+    setQuickFilterCity("all");
+    setQuickFilterArea("all");
+  };
 
   // Currently selected society object
   const activeSociety = useMemo(() => {
@@ -284,13 +313,11 @@ export function HighlightsPage() {
     setSelectedCity(city);
     setSelectedArea("all");
     setSelectedSocietyId("");
-    setIsHighlightsListOpen(true);
   };
 
   const handleAreaChange = (area) => {
     setSelectedArea(area);
     setSelectedSocietyId("");
-    setIsHighlightsListOpen(true);
   };
 
   const handleSocietyChange = (societyId) => {
@@ -908,7 +935,7 @@ export function HighlightsPage() {
                 >
                   {/* City Select */}
                   <div className="w-32 sm:w-36">
-                    <Select value={selectedCity} onValueChange={handleCityChange}>
+                    <Select value={quickFilterCity} onValueChange={handleQuickCityChange}>
                       <SelectTrigger className="h-8 text-xs bg-background/80 border-border">
                         <SelectValue placeholder="All Cities" />
                       </SelectTrigger>
@@ -925,13 +952,13 @@ export function HighlightsPage() {
 
                   {/* Area Select */}
                   <div className="w-32 sm:w-36">
-                    <Select value={selectedArea} onValueChange={handleAreaChange}>
+                    <Select value={quickFilterArea} onValueChange={handleQuickAreaChange}>
                       <SelectTrigger className="h-8 text-xs bg-background/80 border-border">
                         <SelectValue placeholder="All Areas" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="all">All Areas</SelectItem>
-                        {availableAreas.map((a) => (
+                        {quickFilterAvailableAreas.map((a) => (
                           <SelectItem key={a} value={a}>
                             {a}
                           </SelectItem>
@@ -941,35 +968,18 @@ export function HighlightsPage() {
                   </div>
 
                   {/* Reset Filter Button */}
-                  {(selectedCity !== "all" || selectedArea !== "all") && (
+                  {(quickFilterCity !== "all" || quickFilterArea !== "all") && (
                     <Button
                       type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={() => {
-                        setSelectedCity("all");
-                        setSelectedArea("all");
-                      }}
+                      onClick={handleResetQuickFilter}
                       className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                       title="Reset filters"
                     >
                       Clear
                     </Button>
                   )}
-
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setIsHighlightsListOpen((prev) => !prev);
-                    }}
-                    className="h-8 px-2.5 text-xs font-semibold gap-1.5 text-muted-foreground hover:text-foreground shrink-0 cursor-pointer"
-                  >
-                    <span>{isHighlightsListOpen ? "Collapse" : "View"}</span>
-                    <ChevronDown className={`size-4 transition-transform duration-200 ${isHighlightsListOpen ? "rotate-180" : ""}`} />
-                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -1058,16 +1068,13 @@ export function HighlightsPage() {
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-3 rounded-xl bg-muted/30 border border-dashed border-border/80 text-xs text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <Info className="size-4 shrink-0 text-muted-foreground" />
-                        <span>No societies with highlights found for {selectedArea !== "all" ? selectedArea : selectedCity}.</span>
+                        <span>No societies with highlights found for {quickFilterArea !== "all" ? quickFilterArea : quickFilterCity}.</span>
                       </div>
                       <Button
                         type="button"
                         variant="ghost"
                         size="sm"
-                        onClick={() => {
-                          setSelectedCity("all");
-                          setSelectedArea("all");
-                        }}
+                        onClick={handleResetQuickFilter}
                         className="h-7 text-xs text-primary hover:text-primary/80 font-semibold px-2.5 cursor-pointer"
                       >
                         Reset Filter
