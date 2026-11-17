@@ -721,17 +721,17 @@ export function HighlightsPage() {
             {highlights.map((slot) => (
               <Card key={slot.slotNumber} className="border-border overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
                 <CardHeader className="p-4 pb-3 border-b border-border/70 bg-card">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2 min-w-0">
-                      <Badge className="bg-primary text-primary-foreground font-bold text-xs py-0.5 px-2">
+                      <Badge className="bg-primary text-primary-foreground font-bold text-xs py-0.5 px-2 shrink-0 whitespace-nowrap">
                         Slot #{slot.slotNumber}
                       </Badge>
-                      <CardTitle className="text-sm font-bold truncate text-foreground">
+                      <CardTitle className="text-sm font-bold truncate text-foreground min-w-0" title={slot.title || `Global Banner ${slot.slotNumber}`}>
                         {slot.title || `Global Banner ${slot.slotNumber}`}
                       </CardTitle>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-xs font-semibold text-muted-foreground">Active</span>
+                      <span className="text-xs font-semibold text-muted-foreground select-none">Active</span>
                       <Switch
                         checked={slot.isActive}
                         onCheckedChange={() => handleToggleGlobalActive(slot.slotNumber)}
@@ -1239,17 +1239,17 @@ export function HighlightsPage() {
                 {societyHighlights.map((slot) => (
                   <Card key={slot.slotNumber} className="border-border overflow-hidden flex flex-col justify-between shadow-xs hover:shadow-md transition-shadow">
                     <CardHeader className="p-4 pb-3 border-b border-border/70 bg-card">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 min-w-0">
-                          <Badge className="bg-primary text-primary-foreground font-bold text-xs py-0.5 px-2">
+                          <Badge className="bg-primary text-primary-foreground font-bold text-xs py-0.5 px-2 shrink-0 whitespace-nowrap">
                             Slot #{slot.slotNumber}
                           </Badge>
-                          <CardTitle className="text-sm font-bold truncate text-foreground">
+                          <CardTitle className="text-sm font-bold truncate text-foreground min-w-0" title={slot.title || `Society Banner ${slot.slotNumber}`}>
                             {slot.title || `Society Banner ${slot.slotNumber}`}
                           </CardTitle>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs font-semibold text-muted-foreground">Active</span>
+                          <span className="text-xs font-semibold text-muted-foreground select-none">Active</span>
                           <Switch
                             checked={slot.isActive}
                             onCheckedChange={() => handleToggleSocietyActive(slot.slotNumber)}
